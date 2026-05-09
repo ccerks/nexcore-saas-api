@@ -79,7 +79,7 @@ erDiagram
 The API will be available at http://localhost:8000.
 Check the docs at http://localhost:8000/docs.
 
-##🛠️ Project Structure
+## 🛠️ Project Structure
 ```plaintext
   app/
   ├── api/        # Route handlers (Endpoints)

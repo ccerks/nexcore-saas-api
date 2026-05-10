@@ -50,7 +50,7 @@ erDiagram
 ````
 ## 🌟 Key Features
 - **Multi-tenancy:** Efficient data isolation using `tenant_id` pattern.
-- **Advanced Catalog** Self-referential product structures with JSON variation attributes.
+- **Advanced Catalog:** Self-referential product structures with JSON variation attributes.
 - **UUIDs:** All entities use UUID v4 for enhanced security and non-predictable IDs.
 - **Automated Migrations:** Database versioning with Alembic.
 - **Clean Architecture:** Organized structure for easy maintenance and scaling.
@@ -101,18 +101,18 @@ scripts/
   - [x] Docker & Docker Compose orchestration
   - [x] PostgreSQL & Redis integration
   - [x] Alembic migrations setup
-
+        
 - [x] **Phase 2: Identity & Multi-Tenancy**
   - [x] Tenant model and isolation logic
   - [x] User model and relational mapping
   - [x] JWT Authentication (Access & Refresh tokens)
   - [x] Role-Based Access Control (RBAC)
-
+        
 - [ ] **Phase 3: E-commerce & Payments Core**
   - [x] Product and Inventory models per Tenant
   - [ ] Stripe API integration for subscription billing
   - [ ] Webhook listener for async payment events
-
+        
 - [ ] **Phase 4: Performance & Observability**
   - [ ] Advanced Rate Limiting with Redis
   - [ ] Global exception handling and Discord alerts

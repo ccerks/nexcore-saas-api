@@ -2,7 +2,7 @@ import uuid
 from sqlalchemy import Column, String, Boolean, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
-# Importing Base from the db folder
+from sqlalchemy.orm import relationship
 from app.db.session import Base
 
 class Tenant(Base):
@@ -13,3 +13,6 @@ class Tenant(Base):
     slug = Column(String, unique=True, index=True, nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Bidirectional relationship with cascade delete
+    users = relationship("User", back_populates="tenant", cascade="all, delete-orphan")

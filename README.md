@@ -22,7 +22,7 @@ NexCore is a robust, production-ready Multi-Tenant SaaS backend built with **Fas
 erDiagram
     TENANTS ||--o{ USERS : "has"
     TENANTS ||--o{ PRODUCTS : "manages"
-    USERS ||--o{ PRODUCTS : "creates"
+    PRODUCTS ||--o{ PRODUCTS : "parent/child (variations)"
 
     TENANTS {
         uuid id PK
@@ -41,12 +41,16 @@ erDiagram
     PRODUCTS {
         uuid id PK
         uuid tenant_id FK "Data Isolation"
+        uuid parent_id FK "SKU Variations"
         string name
+        string sku_pai
+        json attributes
         float price
     }
 ````
 ## 🌟 Key Features
 - **Multi-tenancy:** Efficient data isolation using `tenant_id` pattern.
+- **Advanced Catalog** Self-referential product structures with JSON variation attributes.
 - **UUIDs:** All entities use UUID v4 for enhanced security and non-predictable IDs.
 - **Automated Migrations:** Database versioning with Alembic.
 - **Clean Architecture:** Organized structure for easy maintenance and scaling.
@@ -66,7 +70,6 @@ erDiagram
 2. Configure environment variables:
    ```bash
    cp .env.example .env
-   # Edit .env with your local credentials if needed
    ```
 3. Spin up the infrastructure::
    ```bash
@@ -76,8 +79,8 @@ erDiagram
    ```bash
    docker-compose exec api alembic upgrade head
    ```
-The API will be available at http://localhost:8000.
-Check the docs at http://localhost:8000/docs.
+The API will be available at http://localhost:8000
+Check the docs at http://localhost:8000/docs
 
 ## 🛠️ Project Structure
 ```plaintext
@@ -87,7 +90,9 @@ Check the docs at http://localhost:8000/docs.
   ├── db/         # Session management & engine
   ├── models/     # SQLAlchemy database models
   ├── schemas/    # Pydantic data contracts
-  └── services/   # Business logic (Service layer)
+  ├── services/   # Business logic (Service layer)
+scripts/
+  └── create_admin.py # Utility for initial system setup
 ```
 ## 🗺️ Development Roadmap
 
@@ -97,14 +102,14 @@ Check the docs at http://localhost:8000/docs.
   - [x] PostgreSQL & Redis integration
   - [x] Alembic migrations setup
 
-- [ ] **Phase 2: Identity & Multi-Tenancy**
-  - [ ] Tenant model and isolation logic
-  - [ ] User model and relational mapping
-  - [ ] JWT Authentication (Access & Refresh tokens)
-  - [ ] Role-Based Access Control (RBAC)
+- [x] **Phase 2: Identity & Multi-Tenancy**
+  - [x] Tenant model and isolation logic
+  - [x] User model and relational mapping
+  - [x] JWT Authentication (Access & Refresh tokens)
+  - [x] Role-Based Access Control (RBAC)
 
 - [ ] **Phase 3: E-commerce & Payments Core**
-  - [ ] Product and Inventory models per Tenant
+  - [x] Product and Inventory models per Tenant
   - [ ] Stripe API integration for subscription billing
   - [ ] Webhook listener for async payment events
 
@@ -114,5 +119,3 @@ Check the docs at http://localhost:8000/docs.
   - [ ] CI/CD Pipeline (GitHub Actions)
 
 **Developed by** [Caio Cerqueira](https://github.com/ccerks) 🚀
-   
-   

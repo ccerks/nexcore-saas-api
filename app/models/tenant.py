@@ -13,6 +13,7 @@ class Tenant(Base):
     slug = Column(String, unique=True, index=True, nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    products = relationship("Product", back_populates="tenant", cascade="all, delete-orphan")
 
     # Bidirectional relationship with cascade delete
     users = relationship("User", back_populates="tenant", cascade="all, delete-orphan")

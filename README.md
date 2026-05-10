@@ -83,7 +83,7 @@ The API will be available at http://localhost:8000
 Check the docs at http://localhost:8000/docs
 
 ## 🛠️ Project Structure
-```plaintext
+```text
   app/
   ├── api/        # Route handlers (Endpoints)
   ├── core/       # Global configs (Security, JWT, Env)

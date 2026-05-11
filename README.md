@@ -125,7 +125,7 @@ scripts/
   - [X] Global exception handling and Discord alerts
   - [X] CI/CD Pipeline (GitHub Actions)
 
--  [ ] Phase 5: Enterprise & Advanced Integrations
+-  [ ] **Phase 5: Enterprise & Advanced Integrations**
   - [ ] Asynchronous messaging and notifications via RabbitMQ
   - [ ] Tenant-level audit logging
   - [ ] Usage dashboards and telemetry

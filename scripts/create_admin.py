@@ -18,7 +18,7 @@ def create_master_user():
     """
     db = SessionLocal()
     try:
-        admin_email = "admin@nexcore.com"
+        admin_email = "admin1@nexcore.com" # Change this to your desired admin email
         
         # Prevent duplicate admin provisioning
         if UserService.get_by_email(db, email=admin_email):
@@ -38,7 +38,7 @@ def create_master_user():
         admin_in = UserCreate(
             tenant_id=tenant.id,
             email=admin_email,
-            password="SecureAdminPassword123!",
+            password="SET HERE", # Change this to a secure password
             full_name="NexCore System Admin",
             role="admin" 
         )

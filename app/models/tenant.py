@@ -17,3 +17,8 @@ class Tenant(Base):
 
     # Bidirectional relationship with cascade delete
     users = relationship("User", back_populates="tenant", cascade="all, delete-orphan")
+
+    # Billing Tracking (Stripe Integration)
+    stripe_customer_id = Column(String, unique=True, index=True, nullable=True)
+    stripe_subscription_id = Column(String, unique=True, index=True, nullable=True)
+

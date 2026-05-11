@@ -11,3 +11,4 @@ bcrypt==3.2.2
 pyjwt==2.8.0
 python-multipart==0.0.9
 alembic==1.13.1
+stripe==5.0.0

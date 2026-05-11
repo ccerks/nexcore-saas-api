@@ -5,6 +5,7 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?logo=postgresql&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
+![Stripe](https://img.shields.io/badge/Stripe-626CD9?logo=Stripe&logoColor=white)
 
 NexCore is a robust, production-ready Multi-Tenant SaaS backend built with **FastAPI**, **PostgreSQL**, and **Redis**. It was designed with a focus on high scalability, data isolation, and modern security patterns.
 
@@ -16,6 +17,7 @@ NexCore is a robust, production-ready Multi-Tenant SaaS backend built with **Fas
 - **Containerization:** [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/)
 - **Validation:** [Pydantic V2](https://docs.pydantic.dev/)
 - **Security:** JWT Authentication & Row-Level Isolation (Shared Schema)
+- **Payments:** [Stripe Python SDK](https://stripe.com/docs/api)
   
 ### 🗄️ Database Entity-Relationship (Multi-Tenant Isolation)
 ```mermaid
@@ -29,6 +31,8 @@ erDiagram
         string name
         string slug
         boolean is_active
+        string stripe_customer_id "Billing"
+        string stripe_subscription_id "Billing"
     }
 
     USERS {
@@ -50,7 +54,8 @@ erDiagram
 ````
 ## 🌟 Key Features
 - **Multi-tenancy:** Efficient data isolation using `tenant_id` pattern.
-- **Advanced Catalog:** Self-referential product structures with JSON variation attributes.
+- **Payment Gateway:** Self-referential product structures with JSON variation attributes.
+- **Advanced Catalog:** Stripe SDK integration for customer provisioning using Atomic Database Transactions (Flush/Rollback).
 - **UUIDs:** All entities use UUID v4 for enhanced security and non-predictable IDs.
 - **Automated Migrations:** Database versioning with Alembic.
 - **Clean Architecture:** Organized structure for easy maintenance and scaling.
@@ -60,6 +65,7 @@ erDiagram
 
 ### Prerequisites
 - Docker & Docker Compose installed.
+- Stripe account (Test Mode Keys).
 
 ### Installation
 1. Clone the repository:
@@ -110,7 +116,7 @@ scripts/
         
 - [ ] **Phase 3: E-commerce & Payments Core**
   - [x] Product and Inventory models per Tenant
-  - [ ] Stripe API integration for subscription billing
+  - [x] Stripe API integration for subscription billing
   - [ ] Webhook listener for async payment events
         
 - [ ] **Phase 4: Performance & Observability**

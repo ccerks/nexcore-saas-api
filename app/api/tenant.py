@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List 
+
 from app.db.session import get_db
 from app.models.tenant import Tenant
 from app.schemas.tenant import TenantCreate, TenantResponse
@@ -14,16 +15,19 @@ router = APIRouter()
 def create_tenant(
     tenant: TenantCreate, 
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user) # Require auth
+    current_user: User = Depends(get_current_user)
 ):
-    # RBAC Check: Only admins can create new tenants
+    """
+    Creates a new Tenant.
+    Requires Admin privileges.
+    """
+    # RBAC Check: Only admins can provision new tenants
     if current_user.role != "admin":
         raise HTTPException(
             status_code=403, 
             detail="The user does not have enough privileges"
         )
         
-    from app.services.tenant import TenantService
     if TenantService.get_by_slug(db, slug=tenant.slug):
         raise HTTPException(status_code=400, detail="Tenant slug already registered")
     
@@ -35,14 +39,12 @@ def read_tenants(
     current_user: User = Depends(get_current_user)
 ):
     """
-    O Filtro de Identidade:
-    Aqui decidimos o que o Treinador pode ver baseado no Crachá (Role).
+    Retrieves a list of Tenants.
+    Applies Data Isolation: Admins see all, regular users see only their own.
     """
-    # Se for o "Professor Carvalho" (Admin), ele tem visão global de todos os Ginásios.
+    # Global visibility for administrators
     if current_user.role == "admin":
         return db.query(Tenant).all()
     
-    # Se for um Treinador comum (user), o GPS dele é travado.
-    # Ele só consegue listar o Ginásio (Tenant) ao qual ele pertence.
-    # Isso impede que o usuário do 'Tenant A' veja dados do 'Tenant B'.
+    # Data isolation for standard users
     return db.query(Tenant).filter(Tenant.id == current_user.tenant_id).all()

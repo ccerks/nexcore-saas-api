@@ -63,7 +63,6 @@ erDiagram
 - **Performance & Observability:** Global rate limiting using the Sliding Window Counter algorithm via Redis Lua scripts (SlowAPI) to mitigate brute-force attacks, coupled with a centralized exception handler that sanitizes client responses and dispatches real-time stack traces to a Discord webhook.
 
 ## 🚀 Getting Started
-
 ### Prerequisites
 - Docker & Docker Compose installed.
 - Stripe account (Test Mode Keys).
@@ -101,8 +100,8 @@ Check the docs at http://localhost:8000/docs
 scripts/
   └── create_admin.py # Utility for initial system setup
 ```
-## 🗺️ Development Roadmap
 
+## 🗺️ Development Roadmap
 - [x] **Phase 1: Foundation**
   - [x] Clean Architecture setup
   - [x] Docker & Docker Compose orchestration
@@ -125,7 +124,7 @@ scripts/
   - [X] Global exception handling and Discord alerts
   - [X] CI/CD Pipeline (GitHub Actions)
 
--  [ ] **Phase 5: Enterprise & Advanced Integrations**
+- [ ] **Phase 5: Enterprise & Advanced Integrations**
   - [ ] Asynchronous messaging and notifications via RabbitMQ
   - [ ] Tenant-level audit logging
   - [ ] Usage dashboards and telemetry

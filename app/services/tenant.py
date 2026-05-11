@@ -73,3 +73,21 @@ class TenantService:
         Retrieves a tenant by its unique slug to prevent duplication.
         """
         return db.query(Tenant).filter(Tenant.slug == slug).first()
+    
+    @staticmethod
+    def get_by_stripe_id(db: Session, stripe_customer_id: str) -> Tenant | None:
+        """
+        Retrieves a tenant based on their external Stripe Customer ID.
+        """
+        return db.query(Tenant).filter(Tenant.stripe_customer_id == stripe_customer_id).first()
+
+    @staticmethod
+    def set_active_status(db: Session, tenant: Tenant, is_active: bool) -> Tenant:
+        """
+        Toggles the operational status of a Tenant.
+        Used by webhooks to disable access upon payment failure or cancellation.
+        """
+        tenant.is_active = is_active
+        db.commit()
+        db.refresh(tenant)
+        return tenant

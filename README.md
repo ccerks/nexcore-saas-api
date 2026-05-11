@@ -54,7 +54,7 @@ erDiagram
 ````
 ## 🌟 Key Features
 - **Multi-tenancy:** Efficient data isolation using `tenant_id` pattern.
-- **Payment Gateway:** Self-referential product structures with JSON variation attributes.
+- **Payment Gateway & Billing:** Stripe SDK integration for customer provisioning using Atomic Database Transactions (Flush/Rollback), paired with a secure Webhook listener for real-time churn control and automated tenant deactivation.
 - **Advanced Catalog:** Stripe SDK integration for customer provisioning using Atomic Database Transactions (Flush/Rollback).
 - **UUIDs:** All entities use UUID v4 for enhanced security and non-predictable IDs.
 - **Automated Migrations:** Database versioning with Alembic.
@@ -117,7 +117,7 @@ scripts/
 - [ ] **Phase 3: E-commerce & Payments Core**
   - [x] Product and Inventory models per Tenant
   - [x] Stripe API integration for subscription billing
-  - [ ] Webhook listener for async payment events
+  - [x] Webhook listener for async payment events
         
 - [ ] **Phase 4: Performance & Observability**
   - [ ] Advanced Rate Limiting with Redis

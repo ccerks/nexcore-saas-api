@@ -16,7 +16,7 @@ NexCore is a robust, production-ready Multi-Tenant SaaS backend built with **Fas
 - **Cache & Rate Limiting:** [Redis](https://redis.io/)
 - **Containerization:** [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/)
 - **Validation:** [Pydantic V2](https://docs.pydantic.dev/)
-- **Security:** JWT Authentication & Row-Level Isolation (Shared Schema)
+- **Security:** JWT Authentication & PostgreSQL Row-Level Security (RLS) on a Shared Schema
 - **Payments:** [Stripe Python SDK](https://stripe.com/docs/api)
   
 ### 🗄️ Database Entity-Relationship (Multi-Tenant Isolation)
@@ -53,14 +53,14 @@ erDiagram
     }
 ````
 ## 🌟 Key Features
-- **Multi-tenancy:** Efficient data isolation using `tenant_id` pattern.
+- **Multi-tenancy:** Efficient data isolation using tenant_id pattern and Row-Level Security (RLS).
 - **Payment Gateway & Billing:** Stripe SDK integration for customer provisioning using Atomic Database Transactions (Flush/Rollback), paired with a secure Webhook listener for real-time churn control and automated tenant deactivation.
-- **Advanced Catalog:** Stripe SDK integration for customer provisioning using Atomic Database Transactions (Flush/Rollback).
+- **Advanced Catalog:** Complex product management supporting hierarchical SKU variations (parent/child relationships) and JSON-based dynamic attributes.
 - **UUIDs:** All entities use UUID v4 for enhanced security and non-predictable IDs.
 - **Automated Migrations:** Database versioning with Alembic.
 - **Clean Architecture:** Organized structure for easy maintenance and scaling.
 - **Interactive API Docs:** Auto-generated Swagger and ReDoc.
-- **Performance & Observability:** Global rate limiting powered by Redis (SlowAPI) to mitigate brute-force attacks, coupled with a centralized exception handler that sanitizes client responses and dispatches real-time stack traces to a Discord webhook.
+- **Performance & Observability:** Global rate limiting using the Sliding Window Counter algorithm via Redis Lua scripts (SlowAPI) to mitigate brute-force attacks, coupled with a centralized exception handler that sanitizes client responses and dispatches real-time stack traces to a Discord webhook.
 
 ## 🚀 Getting Started
 
@@ -124,5 +124,11 @@ scripts/
   - [X] Advanced Rate Limiting with Redis
   - [X] Global exception handling and Discord alerts
   - [X] CI/CD Pipeline (GitHub Actions)
+
+-  [ ] Phase 5: Enterprise & Advanced Integrations
+  - [ ] Asynchronous messaging and notifications via RabbitMQ
+  - [ ] Tenant-level audit logging
+  - [ ] Usage dashboards and telemetry
+  - [ ] Physical database isolation strategies (Dedicated Schemas)
 
 **Developed by** [Caio Cerqueira](https://github.com/ccerks) 🚀

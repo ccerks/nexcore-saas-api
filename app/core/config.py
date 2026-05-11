@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     STRIPE_PUBLISHABLE_KEY: str
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
 
+    # Alerts Settings
+    DISCORD_WEBHOOK_URL: Optional[str] = None
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 settings = Settings()

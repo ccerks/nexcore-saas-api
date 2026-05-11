@@ -60,6 +60,7 @@ erDiagram
 - **Automated Migrations:** Database versioning with Alembic.
 - **Clean Architecture:** Organized structure for easy maintenance and scaling.
 - **Interactive API Docs:** Auto-generated Swagger and ReDoc.
+- **Performance & Observability:** Global rate limiting powered by Redis (SlowAPI) to mitigate brute-force attacks, coupled with a centralized exception handler that sanitizes client responses and dispatches real-time stack traces to a Discord webhook.
 
 ## 🚀 Getting Started
 
@@ -114,14 +115,14 @@ scripts/
   - [x] JWT Authentication (Access & Refresh tokens)
   - [x] Role-Based Access Control (RBAC)
         
-- [ ] **Phase 3: E-commerce & Payments Core**
+- [X] **Phase 3: E-commerce & Payments Core**
   - [x] Product and Inventory models per Tenant
   - [x] Stripe API integration for subscription billing
   - [x] Webhook listener for async payment events
         
-- [ ] **Phase 4: Performance & Observability**
-  - [ ] Advanced Rate Limiting with Redis
-  - [ ] Global exception handling and Discord alerts
-  - [ ] CI/CD Pipeline (GitHub Actions)
+- [X] **Phase 4: Performance & Observability**
+  - [X] Advanced Rate Limiting with Redis
+  - [X] Global exception handling and Discord alerts
+  - [X] CI/CD Pipeline (GitHub Actions)
 
 **Developed by** [Caio Cerqueira](https://github.com/ccerks) 🚀

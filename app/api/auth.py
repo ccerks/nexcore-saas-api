@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+
+from app.core.limiter import limiter
 from app.db.session import get_db
 from app.services.user import UserService
 from app.core.security import create_access_token
@@ -9,8 +11,18 @@ from app.schemas.token import Token
 router = APIRouter()
 
 @router.post("/login", response_model=Token)
-def login(db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends()):
+@limiter.limit("5/minute")
+def login(
+    request: Request,  
+    db: Session = Depends(get_db), 
+    form_data: OAuth2PasswordRequestForm = Depends()
+):
+    """
+    Autentica um usuário e retorna o token JWT.
+    Protegido por Rate Limiting (Máximo de 5 tentativas por minuto por IP).
+    """
     user = UserService.authenticate(db, email=form_data.username, password=form_data.password)
+    
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

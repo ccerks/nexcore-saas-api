@@ -51,7 +51,7 @@ async def root():
 async def health_check():
     """
     Health check endpoint.
-    Currently modified to trigger a simulated critical failure.
+    mod to trigger a simulated critical failure.
     """
     # Simulated critical failure to test Discord alerting
     #raise Exception("Simulated Core System Failure - Testing Discord Integration")

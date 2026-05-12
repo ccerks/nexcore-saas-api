@@ -13,6 +13,26 @@ services:
       - .:/app # Maps the root folder to /app inside the container
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
+  worker:
+    build: .
+    container_name: nexcore_worker
+    command: python worker.py
+    depends_on:
+      - rabbitmq
+      - db
+    env_file:
+      - .env
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: nexcore_rabbitmq
+    ports:
+      - "5672:5672"   # AMQP protocol
+      - "15672:15672" # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
   db:
     image: postgres:15-alpine
     container_name: nexcore_db
@@ -35,3 +55,4 @@ services:
 
 volumes:
   postgres_data:
+

@@ -2,11 +2,22 @@ from fastapi import APIRouter, Request, HTTPException, Header, Depends
 from sqlalchemy.orm import Session
 import stripe
 
+# Webhook
 from app.core.config import settings
 from app.db.session import get_db
 from app.services.tenant import TenantService
 
+#Chekout
+from app.api.deps import get_current_user
+from app.models.user import User
+from app.schemas.payment import CheckoutSessionRequest, CheckoutSessionResponse
+from app.services.stripe_service import StripeService
+
 router = APIRouter()
+
+# ... (aqui embaixo continua o seu código do @router.post("/webhook") intacto) ...
+
+# ... (e depois do webhook, você cola a nova rota @router.post("/checkout")) ...
 
 @router.post("/webhook")
 async def stripe_webhook(
@@ -57,3 +68,21 @@ async def stripe_webhook(
         print(f"⚠️ [WEBHOOK] Unhandled event type: {event_type}")
 
     return {"status": "success"}
+@router.post("/checkout", response_model=CheckoutSessionResponse)
+def create_checkout(
+    request: CheckoutSessionRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Generates a secure Stripe Checkout URL for the current tenant.
+    """
+    try:
+        checkout_url = StripeService.create_checkout_session(
+            tenant_id=str(current_user.tenant_id),
+            price_id=request.price_id,
+            success_url=request.success_url,
+            cancel_url=request.cancel_url
+        )
+        return CheckoutSessionResponse(checkout_url=checkout_url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

@@ -25,3 +25,25 @@ class StripeService:
         except stripe.error.StripeError as e:
             # In a production environment, this should log to a monitoring service (e.g., Sentry)
             raise ValueError(f"Stripe Integration Error: {str(e)}")
+        
+    @staticmethod
+    def create_checkout_session(tenant_id: str, price_id: str, success_url: str, cancel_url: str) -> str:
+        """
+        Creates a Stripe Checkout Session for a tenant subscription.
+        """
+        try:
+            session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=[{
+                    'price': price_id,
+                    'quantity': 1,
+                }],
+                mode='subscription',
+                success_url=success_url,
+                cancel_url=cancel_url,
+                client_reference_id=tenant_id, # Crucial: Maps the payment back to our Tenant
+                metadata={"tenant_id": tenant_id}
+            )
+            return session.url
+        except Exception as e:
+            raise ValueError(f"Stripe Session Error: {str(e)}")

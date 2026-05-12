@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from typing import List
+
 from app.db.session import get_db
-from app.schemas.product import ProductCreate, ProductResponse
-from app.services.product import ProductService
 from app.api.deps import get_current_user
 from app.models.user import User
+from app.schemas.product import ProductCreate, ProductResponse
+from app.schemas.pagination import PaginatedResponse
+from app.services.product import ProductService
 
 router = APIRouter()
 
@@ -16,35 +17,45 @@ def create_product(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Create a new product.
-    Enforces SKU uniqueness per tenant and injects the user's tenant_id.
+    Create a new product for the authenticated tenant.
+    Validates SKU uniqueness to prevent duplicates.
     """
     existing_product = ProductService.get_by_sku(
-        db, 
+        db=db, 
         tenant_id=current_user.tenant_id, 
-        sku_pai=product_in.sku_pai,
+        sku_pai=product_in.sku_pai, 
         sku_filho=product_in.sku_filho
     )
     
     if existing_product:
         raise HTTPException(
-            status_code=400,
-            detail="A product with this SKU configuration already exists in your catalog."
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A product with this SKU already exists in your catalog."
         )
-    
-    return ProductService.create(db, product_in=product_in, tenant_id=current_user.tenant_id)
 
-@router.get("/", response_model=List[ProductResponse])
-def read_products(
-    skip: int = 0,
-    limit: int = 100,
+    return ProductService.create(
+        db=db, 
+        product_in=product_in, 
+        tenant_id=current_user.tenant_id
+    )
+
+
+@router.get("/", response_model=PaginatedResponse[ProductResponse])
+def list_products(
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(20, ge=1, le=100, description="Items per page"),
+    name: str | None = Query(None, description="Filter by product name"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Retrieve products.
-    Strictly isolated: returns only products belonging to the current user's tenant.
+    Retrieve a paginated list of products for the authenticated tenant.
+    Includes optional search filters.
     """
-    return ProductService.get_all_by_tenant(
-        db, tenant_id=current_user.tenant_id, skip=skip, limit=limit
+    return ProductService.get_paginated_products(
+        db=db,
+        tenant_id=current_user.tenant_id,
+        page=page,
+        size=size,
+        name_filter=name
     )

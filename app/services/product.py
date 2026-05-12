@@ -1,6 +1,8 @@
+import math
 from sqlalchemy.orm import Session
 from uuid import UUID
 from typing import List
+
 from app.models.product import Product
 from app.schemas.product import ProductCreate
 
@@ -45,3 +47,34 @@ class ProductService:
             query = query.filter(Product.sku_filho == sku_filho)
             
         return query.first()
+    
+    @staticmethod
+    def get_paginated_products(
+        db: Session, 
+        tenant_id: UUID, 
+        page: int = 1, 
+        size: int = 20, 
+        name_filter: str | None = None
+    ) -> dict:
+        """
+        Retrieve a paginated list of products with optional filtering.
+        Returns a dictionary compatible with the PaginatedResponse schema.
+        """
+        query = db.query(Product).filter(Product.tenant_id == tenant_id)
+
+        if name_filter:
+            query = query.filter(Product.name.ilike(f"%{name_filter}%"))
+
+        total_records = query.count()
+        total_pages = math.ceil(total_records / size) if total_records > 0 else 1
+        
+        offset_value = (page - 1) * size
+        products = query.offset(offset_value).limit(size).all()
+
+        return {
+            "items": products,
+            "total": total_records,
+            "page": page,
+            "size": size,
+            "pages": total_pages
+        }

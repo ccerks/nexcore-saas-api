@@ -78,3 +78,22 @@ class ProductService:
             "size": size,
             "pages": total_pages
         }
+    
+    @staticmethod
+    def update_image_url(db: Session, product_id: UUID, tenant_id: UUID, image_url: str) -> Product | None:
+        """
+        Updates the image URL of a specific product.
+        Enforces tenant isolation to prevent unauthorized modifications.
+        """
+        product = db.query(Product).filter(
+            Product.id == product_id, 
+            Product.tenant_id == tenant_id
+        ).first()
+        
+        if not product:
+            return None
+            
+        product.image_url = image_url
+        db.commit()
+        db.refresh(product)
+        return product

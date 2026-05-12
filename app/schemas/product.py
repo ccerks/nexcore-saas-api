@@ -11,6 +11,7 @@ class ProductBase(BaseModel):
     is_variation: bool = False
     price: float
     stock: int = 0
+    image_url: str | None = None
 
 class ProductCreate(ProductBase):
     parent_id: Optional[UUID] = None
@@ -48,5 +49,6 @@ class ProductResponse(ProductBase):
     tenant_id: UUID
     parent_id: Optional[UUID] = None
     attributes: Optional[Dict[str, Any]] = None 
+    
 
     model_config = ConfigDict(from_attributes=True)

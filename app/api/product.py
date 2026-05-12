@@ -1,12 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile
 from sqlalchemy.orm import Session
-
+from uuid import UUID
 from app.db.session import get_db
 from app.api.deps import get_current_user
 from app.models.user import User
 from app.schemas.product import ProductCreate, ProductResponse
 from app.schemas.pagination import PaginatedResponse
 from app.services.product import ProductService
+from app.services.storage import StorageService
 
 router = APIRouter()
 
@@ -59,3 +60,31 @@ def list_products(
         size=size,
         name_filter=name
     )
+
+@router.post("/{product_id}/image", response_model=ProductResponse)
+async def upload_product_image(
+    product_id: UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Upload a main image for a specific product.
+    Files are stored securely and linked to the product's database record.
+    """
+    image_url = await StorageService.save_product_image(file, str(current_user.tenant_id))
+    
+    updated_product = ProductService.update_image_url(
+        db=db, 
+        product_id=product_id, 
+        tenant_id=current_user.tenant_id, 
+        image_url=image_url
+    )
+    
+    if not updated_product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product not found or access denied."
+        )
+        
+    return updated_product

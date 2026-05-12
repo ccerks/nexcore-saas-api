@@ -1,4 +1,6 @@
+import os
 from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -8,10 +10,15 @@ from app.core.limiter import limiter
 from app.api import tenant, user, auth, product, payment
 from app.services.discord import DiscordService
 
+os.makedirs("uploads/products", exist_ok=True)
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url="/api/v1/openapi.json"
 )
+
+# Mount the static directory to serve images publicly
+app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
 # Register SlowAPI
 app.state.limiter = limiter
@@ -24,13 +31,9 @@ async def global_exception_handler(request: Request, exc: Exception):
     Catches all unhandled exceptions, sanitizes the user response,
     and dispatches the stack trace to the engineering team via Discord.
     """
-    # Formats the error context
     error_context = f"Path: {request.method} {request.url.path}\nError: {str(exc)}\n"
-    
-    # Transmits to Discord
     DiscordService.send_alert(error_context)
     
-    # Returns a sanitized generic message to the client (Security standard)
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal Server Error. Our engineering team has been notified."},
@@ -51,9 +54,5 @@ async def root():
 async def health_check():
     """
     Health check endpoint.
-    mod to trigger a simulated critical failure.
     """
-    # Simulated critical failure to test Discord alerting
-    #raise Exception("Simulated Core System Failure - Testing Discord Integration")
-    
     return {"status": "healthy"}

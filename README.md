@@ -185,7 +185,7 @@ scripts/
   - [x] Tenant-level audit logging
   - [x] Advanced Data Retention (Soft Delete & Historical Tracking)
   - [x] Executive Dashboard (BFF Aggregation)
-  - [ ] Asynchronous messaging and notifications via RabbitMQ
+  - [X] Asynchronous messaging and notifications via RabbitMQ
   - [ ] Physical database isolation strategies (Dedicated Schemas)
 
 **Developed by** [Caio Cerqueira](https://github.com/ccerks) 🚀

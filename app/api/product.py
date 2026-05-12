@@ -37,7 +37,8 @@ def create_product(
     return ProductService.create(
         db=db, 
         product_in=product_in, 
-        tenant_id=current_user.tenant_id
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id
     )
 
 

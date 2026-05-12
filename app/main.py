@@ -7,7 +7,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.core.config import settings
 from app.core.limiter import limiter
-from app.api import tenant, user, auth, product, payment
+from app.api import tenant, user, auth, product, payment, audit
 from app.services.discord import DiscordService
 
 os.makedirs("uploads/products", exist_ok=True)
@@ -19,6 +19,8 @@ app = FastAPI(
 
 # Mount the static directory to serve images publicly
 app.mount("/static", StaticFiles(directory="uploads"), name="static")
+
+
 
 # Register SlowAPI
 app.state.limiter = limiter
@@ -45,6 +47,7 @@ app.include_router(user.router, prefix="/api/v1/users", tags=["Users"])
 app.include_router(tenant.router, prefix="/api/v1/tenants", tags=["Tenants"])
 app.include_router(product.router, prefix="/api/v1/products", tags=["Products"])
 app.include_router(payment.router, prefix="/api/v1/payments", tags=["Payments & Webhooks"])
+app.include_router(audit.router, prefix="/api/v1/audit", tags=["Audit & Logs"])
 
 @app.get("/")
 async def root():

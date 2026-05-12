@@ -7,6 +7,11 @@ from alembic import context
 from app.db.session import Base
 from app.models.tenant import Tenant 
 from app.models.user import User
+from app.models.product import Product
+from app.models.audit import AuditLog
+
+# 3. Set the target metadata
+target_metadata = Base.metadata
 
 config = context.config
 

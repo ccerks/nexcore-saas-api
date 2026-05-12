@@ -58,6 +58,9 @@ erDiagram
         string image_url "Storage Path"
         json attributes
         float price
+        datetime deleted_at "Soft Delete"
+        uuid last_deleted_by FK
+        int deactivation_count "History"
     }
 
     AUDIT_LOGS {
@@ -78,6 +81,8 @@ erDiagram
 - **Advanced Catalog:** Complex product management supporting hierarchical SKU variations (parent/child relationships) and JSON-based dynamic attributes.
 - **Secure Storage:** Managed multipart file uploads for product images, with UUID-based renaming and protected static serving.
 - **Audit & Traceability:** Immutable audit logging for critical entity actions, safely stored via atomic transactions.
+- **Data Retention & Soft Deletion:** Logical deletion pattern ensuring database referential integrity, coupled with historical metadata tracking.
+- **Backend-For-Frontend (BFF):** Aggregated dashboard metrics endpoint designed to reduce client-side network round-trips and optimize initial load times.
 - **UUIDs:** All entities use UUID v4 for enhanced security and non-predictable IDs.
 - **Automated Migrations:** Database versioning with Alembic.
 - **Clean Architecture:** Organized structure for easy maintenance and scaling.
@@ -178,7 +183,8 @@ scripts/
 
 - [x] **Phase 5: Enterprise & Advanced Integrations**
   - [x] Tenant-level audit logging
-  - [ ] Usage dashboards and telemetry
+  - [x] Advanced Data Retention (Soft Delete & Historical Tracking)
+  - [x] Executive Dashboard (BFF Aggregation)
   - [ ] Asynchronous messaging and notifications via RabbitMQ
   - [ ] Physical database isolation strategies (Dedicated Schemas)
 

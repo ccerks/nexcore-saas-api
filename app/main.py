@@ -7,7 +7,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.core.config import settings
 from app.core.limiter import limiter
-from app.api import tenant, user, auth, product, payment, audit
+from app.api import tenant, user, auth, product, payment, audit, dashboard
 from app.services.discord import DiscordService
 
 os.makedirs("uploads/products", exist_ok=True)
@@ -45,6 +45,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(user.router, prefix="/api/v1/users", tags=["Users"])
 app.include_router(tenant.router, prefix="/api/v1/tenants", tags=["Tenants"])
+app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["Dashboard"])
 app.include_router(product.router, prefix="/api/v1/products", tags=["Products"])
 app.include_router(payment.router, prefix="/api/v1/payments", tags=["Payments & Webhooks"])
 app.include_router(audit.router, prefix="/api/v1/audit", tags=["Audit & Logs"])

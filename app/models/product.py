@@ -1,5 +1,7 @@
+# app/models/product.py
 import uuid
-from sqlalchemy import Column, String, Float, Integer, Boolean, ForeignKey, JSON
+from datetime import datetime, timezone
+from sqlalchemy import Column, String, Float, Integer, Boolean, ForeignKey, JSON, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -22,6 +24,11 @@ class Product(Base):
     stock = Column(Integer, default=0)
     attributes = Column(JSON, nullable=True)
     image_url = Column(String, nullable=True)
+    
+    # Soft delete and historical metadata
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    last_deleted_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    deactivation_count = Column(Integer, default=0)
 
     tenant = relationship("Tenant", back_populates="products")
     children = relationship("Product", backref="parent", remote_side=[id])

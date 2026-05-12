@@ -9,6 +9,7 @@ from app.schemas.pagination import PaginatedResponse
 from app.services.product import ProductService
 from app.services.storage import StorageService
 
+
 router = APIRouter()
 
 @router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
@@ -18,28 +19,22 @@ def create_product(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Create a new product for the authenticated tenant.
-    Validates SKU uniqueness to prevent duplicates.
+    Create a new product or restore a soft-deleted one if SKU matches.
     """
-    existing_product = ProductService.get_by_sku(
-        db=db, 
-        tenant_id=current_user.tenant_id, 
-        sku_pai=product_in.sku_pai, 
-        sku_filho=product_in.sku_filho
-    )
-    
-    if existing_product:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="A product with this SKU already exists in your catalog."
-        )
-
-    return ProductService.create(
+    product = ProductService.create(
         db=db, 
         product_in=product_in, 
         tenant_id=current_user.tenant_id,
         user_id=current_user.id
     )
+    
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A product with this SKU already exists and is active."
+        )
+
+    return product
 
 
 @router.get("/", response_model=PaginatedResponse[ProductResponse])
@@ -89,3 +84,53 @@ async def upload_product_image(
         )
         
     return updated_product
+
+from fastapi import Response # Adicione no topo
+
+@router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
+def create_product(
+    product_in: ProductCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Create a new product or restore a soft-deleted one if SKU matches.
+    """
+    product = ProductService.create(
+        db=db, 
+        product_in=product_in, 
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id
+    )
+    
+    # Se o Service devolveu None, é porque existe um produto ativo com esse SKU
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A product with this SKU already exists and is active."
+        )
+
+    return product
+
+@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_product(
+    product_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Soft-delete a product. It will be hidden from catalogs but retained in the database.
+    """
+    success = ProductService.delete(
+        db=db,
+        product_id=product_id,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id
+    )
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product not found or already deleted."
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

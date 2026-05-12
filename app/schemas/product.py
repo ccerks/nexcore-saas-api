@@ -4,13 +4,14 @@ from typing import Optional, Dict, Any, Union
 
 class ProductBase(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     sku_pai: str
-    sku_filho: Optional[str] = None
-    ean: Optional[str] = None
+    sku_filho: str | None = None
+    ean: str | None = None
     is_variation: bool = False
     price: float
     stock: int = 0
+    attributes: Dict[str, Any] | None = None
     image_url: str | None = None
 
 class ProductCreate(ProductBase):
@@ -48,7 +49,15 @@ class ProductResponse(ProductBase):
     id: UUID
     tenant_id: UUID
     parent_id: Optional[UUID] = None
-    attributes: Optional[Dict[str, Any]] = None 
+    deactivation_count: int = 0
     
-
+    @field_validator('deactivation_count', mode='before')
+    @classmethod
+    def set_legacy_deactivation_count(cls, v: Any) -> int:
+        """
+        Defensive programming for legacy records.
+        Converts NULL values from the database into 0.
+        """
+        return v if v is not None else 0
+    
     model_config = ConfigDict(from_attributes=True)

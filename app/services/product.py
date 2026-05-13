@@ -1,8 +1,10 @@
 import math
 import json
 import pika
+from typing import List
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from uuid import UUID
 
 from app.models.product import Product
@@ -40,6 +42,31 @@ class ProductService:
         db.commit()
         db.refresh(db_product)
         return db_product
+
+    @classmethod
+    def bulk_create(cls, db: Session, products_in: List[ProductCreate], tenant_id: UUID, user_id: UUID) -> List[Product] | None:
+        """
+        Processes a bulk insertion of products using an atomic transaction.
+        Rolls back the entire batch if an IntegrityError (e.g., duplicate SKU) occurs.
+        """
+        try:
+            db_products = []
+            for p_in in products_in:
+                product_data = p_in.model_dump(exclude_unset=True)
+                db_product = Product(**product_data, tenant_id=tenant_id)
+                db_products.append(db_product)
+
+            db.add_all(db_products)
+            db.commit()
+
+            for product in db_products:
+                db.refresh(product)
+                
+            return db_products
+            
+        except IntegrityError:
+            db.rollback()
+            return None
 
     @staticmethod
     def get_paginated_products(db: Session, tenant_id: UUID, page: int = 1, size: int = 20, name_filter: str | None = None) -> dict:
@@ -87,7 +114,6 @@ class ProductService:
         db.commit()
         db.refresh(product)
         
-        # Event-Driven Architecture: Dispatch cleanup task to RabbitMQ
         if old_image_url and old_image_url != image_url:
             try:
                 connection = pika.BlockingConnection(pika.ConnectionParameters(host='rabbitmq'))

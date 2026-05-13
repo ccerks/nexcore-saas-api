@@ -4,26 +4,27 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-005571?logo=fastapi)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?logo=postgresql&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white)
+![RabbitMQ](https://img.shields.io/badge/RabbitMQ-FF6600?logo=rabbitmq&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
 ![Stripe](https://img.shields.io/badge/Stripe-626CD9?logo=Stripe&logoColor=white)
+![Pytest](https://img.shields.io/badge/Pytest-Certified-brightgreen.svg?logo=pytest)
 
 NexCore is a robust, production-ready Multi-Tenant SaaS backend built with **FastAPI**, **PostgreSQL**, and **Redis**. It was designed with a focus on high scalability, data isolation, and modern security patterns.
 
 ## 🏗️ Architecture & Stack
 - **Framework:** [FastAPI](https://fastapi.tiangolo.com/) (Async, Type Safety, OpenAPI)
 - **Database:** [PostgreSQL](https://www.postgresql.org/) with [SQLAlchemy 2.0](https://www.sqlalchemy.org/)
+- **Testing:** [Pytest](https://docs.pytest.org/) & [Faker](https://faker.readthedocs.io/) (TDD Approach)
 - **Migrations:** [Alembic](https://alembic.sqlalchemy.org/)
 - **Cache & Rate Limiting:** [Redis](https://redis.io/)
+- **Message Broker:** [RabbitMQ](https://www.rabbitmq.com/) (Event-Driven Background Tasks)
 - **Containerization:** [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/)
 - **Validation:** [Pydantic V2](https://docs.pydantic.dev/)
 - **Security:** JWT Authentication & PostgreSQL Row-Level Security (RLS) on a Shared Schema
 - **Payments:** [Stripe Python SDK](https://stripe.com/docs/api)
-  
+
 ### 🗄️ Database Entity-Relationship (Multi-Tenant Isolation)
 We utilize a **Shared Schema** approach where all Tenants reside in the same database but are logically isolated.
-
-- **Data Isolation:** Every critical table (Users, Products, etc.) contains a `tenant_id` foreign key.
-- **Query Filtering:** All database queries are automatically filtered by the `tenant_id` extracted from the JWT, ensuring a Merchant can never access another Merchant's data.
 
 ```mermaid
 erDiagram
@@ -78,8 +79,11 @@ erDiagram
 ## 🌟 Key Features
 - **Multi-tenancy:** Efficient data isolation using tenant_id pattern and Row-Level Security (RLS).
 - **Payment Gateway & Billing:** Stripe SDK integration for customer provisioning using Atomic Database Transactions (Flush/Rollback), paired with a secure Webhook listener for real-time churn control and automated tenant deactivation.
+- **High-Performance Ingestion (Bulk Insert):** Atomic batch processing for product catalogs, ensuring database integrity with automatic full-batch rollbacks on SKU conflicts.
+- **Event-Driven Architecture:** Asynchronous background task processing using RabbitMQ (e.g., orphaned image cleanup) to guarantee low-latency HTTP responses.
 - **Advanced Catalog:** Complex product management supporting hierarchical SKU variations (parent/child relationships) and JSON-based dynamic attributes.
 - **Secure Storage:** Managed multipart file uploads for product images, with UUID-based renaming and protected static serving.
+- **Automated QA (TDD):** Full testing suite with Pytest using a dynamic PostgreSQL test database factory. Data generation powered by Faker.
 - **Audit & Traceability:** Immutable audit logging for critical entity actions, safely stored via atomic transactions.
 - **Data Retention & Soft Deletion:** Logical deletion pattern ensuring database referential integrity, coupled with historical metadata tracking.
 - **Backend-For-Frontend (BFF):** Aggregated dashboard metrics endpoint designed to reduce client-side network round-trips and optimize initial load times.
@@ -98,7 +102,7 @@ erDiagram
 ### Installation
 1. Clone the repository:
    ```bash
-   git clone [https://github.com/ccerks/nexcore-saas-api.git](https://github.com/ccerks/nexcore-saas-api.git)
+   git clone https://github.com/ccerks/nexcore-saas-api.git
    cd nexcore-saas-api
    ```
 2. Configure environment variables:
@@ -115,6 +119,12 @@ erDiagram
    ```
 The API will be available at http://localhost:8000
 Check the docs at http://localhost:8000/docs
+
+### 🧪 Running Tests
+The project includes a dedicated Test Environment with an isolated database. To run the automated tests:
+```bash
+docker compose exec api python -m pytest tests/
+```
 
 ## 💳 Stripe Setup & Local Testing
 To handle real-time billing events (Webhooks) during development, follow these steps:
@@ -145,12 +155,13 @@ The system features a Global Exception Handler that monitors the health of the A
 ## 🛠️ Project Structure
 ```text
   app/
-  ├── api/        # Route handlers (Endpoints)
-  ├── core/       # Global configs (Security, JWT, Env)
-  ├── db/         # Session management & engine
-  ├── models/     # SQLAlchemy database models
-  ├── schemas/    # Pydantic data contracts
-  ├── services/   # Business logic (Service layer)
+  ├── api/         # Route handlers (Endpoints)
+  ├── core/        # Global configs (Security, JWT, Env)
+  ├── db/          # Session management & engine
+  ├── models/      # SQLAlchemy database models
+  ├── schemas/     # Pydantic data contracts
+  ├── services/    # Business logic (Service layer)
+tests/             # Automated test suite (Pytest + Faker)
 scripts/
   └── create_admin.py # Utility for initial system setup
 ```
@@ -171,6 +182,7 @@ scripts/
         
 - [x] **Phase 3: E-commerce & Payments Core**
   - [x] Product and Inventory models per Tenant
+  - [x] Bulk Insert functionality (Horde Encounters)
   - [x] Stripe API integration for subscription billing
   - [x] Webhook listener for async payment events
   - [x] Secure File/Image Storage handling
@@ -180,12 +192,13 @@ scripts/
   - [x] Paginated endpoints for resource lists
   - [x] Global exception handling and Discord alerts
   - [x] CI/CD Pipeline (GitHub Actions)
+  - [x] Automated Testing Suite (Pytest + Faker)
 
 - [x] **Phase 5: Enterprise & Advanced Integrations**
   - [x] Tenant-level audit logging
   - [x] Advanced Data Retention (Soft Delete & Historical Tracking)
   - [x] Executive Dashboard (BFF Aggregation)
-  - [X] Asynchronous messaging and notifications via RabbitMQ
+  - [x] Asynchronous messaging and notifications via RabbitMQ
   - [ ] Physical database isolation strategies (Dedicated Schemas)
 
 **Developed by** [Caio Cerqueira](https://github.com/ccerks) 🚀

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile, Response, Request
 from sqlalchemy.orm import Session
 from uuid import UUID
+from typing import List
 
 from app.db.session import get_db
 from app.api.deps import get_current_user
@@ -22,8 +23,8 @@ def user_token_key(request: Request) -> str:
     This ensures that limits are applied per authenticated tenant session,
     preventing the 'Noisy Neighbor' problem in shared IP environments.
     """
-    return request.headers.get("Authorization", request.client.host)
-
+    fallback_ip = request.client.host if request.client else "127.0.0.1"
+    return request.headers.get("Authorization", fallback_ip)
 
 @router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("60/minute", key_func=user_token_key)
@@ -34,7 +35,7 @@ def create_product(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Creates a new product. 
+    Creates a single new product. 
     Enforces free tier limits, handles SKU conflicts, and limits creation rate per tenant.
     """
     tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
@@ -68,6 +69,48 @@ def create_product(
 
     return product
 
+@router.post("/bulk", response_model=List[ProductResponse], status_code=status.HTTP_201_CREATED)
+@limiter.limit("20/minute", key_func=user_token_key)
+def bulk_create_products(
+    request: Request,
+    products_in: List[ProductCreate],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Creates multiple products in a single transaction (Bulk Insert).
+    Enforces quota limits based on the total batch size to prevent limit circumvention.
+    """
+    tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
+    
+    active_products_count = db.query(Product).filter(
+        Product.tenant_id == current_user.tenant_id,
+        Product.deleted_at == None
+    ).count()
+
+    is_free_tier = not tenant.stripe_subscription_id
+    free_limit = 5
+
+    if is_free_tier and (active_products_count + len(products_in)) > free_limit:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Bulk insert rejected. This batch would exceed your Free Tier limit of {free_limit} products. You currently have {active_products_count} active products."
+        )
+
+    created_products = ProductService.bulk_create(
+        db=db,
+        products_in=products_in,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id
+    )
+
+    if not created_products:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Bulk insertion failed. One or more products caused a SKU conflict. The entire batch was rolled back."
+        )
+
+    return created_products
 
 @router.get("/", response_model=PaginatedResponse[ProductResponse])
 @limiter.limit("120/minute", key_func=user_token_key)
@@ -90,7 +133,6 @@ def list_products(
         size=size,
         name_filter=name
     )
-
 
 @router.post("/{product_id}/image", response_model=ProductResponse)
 @limiter.limit("30/minute", key_func=user_token_key)
@@ -121,7 +163,6 @@ async def upload_product_image(
         )
         
     return updated_product
-
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 @limiter.limit("60/minute", key_func=user_token_key)

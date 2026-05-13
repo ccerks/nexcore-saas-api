@@ -22,6 +22,8 @@ services:
       - db
     env_file:
       - .env
+    volumes:
+      - ./uploads:/app/uploads # Maps the uploads folder to /app/uploads inside the container
 
   rabbitmq:
     image: rabbitmq:3-management-alpine

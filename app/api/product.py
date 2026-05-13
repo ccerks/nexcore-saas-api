@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile, Response, Request
 from sqlalchemy.orm import Session
 from uuid import UUID
 
@@ -11,17 +11,31 @@ from app.schemas.product import ProductCreate, ProductResponse
 from app.schemas.pagination import PaginatedResponse
 from app.services.product import ProductService
 from app.services.storage import StorageService
+from app.core.limiter import limiter
 
 router = APIRouter()
 
+def user_token_key(request: Request) -> str:
+    """
+    Custom key function for SlowAPI.
+    Uses the Authorization token as the rate limit key instead of the IP address.
+    This ensures that limits are applied per authenticated tenant session,
+    preventing the 'Noisy Neighbor' problem in shared IP environments.
+    """
+    return request.headers.get("Authorization", request.client.host)
+
+
 @router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("60/minute", key_func=user_token_key)
 def create_product(
+    request: Request,
     product_in: ProductCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Creates a new product. Enforces free tier limits and handles SKU conflicts or restoration.
+    Creates a new product. 
+    Enforces free tier limits, handles SKU conflicts, and limits creation rate per tenant.
     """
     tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
     
@@ -54,8 +68,11 @@ def create_product(
 
     return product
 
+
 @router.get("/", response_model=PaginatedResponse[ProductResponse])
+@limiter.limit("120/minute", key_func=user_token_key)
 def list_products(
+    request: Request,
     page: int = Query(1, ge=1, description="Page number"),
     size: int = Query(20, ge=1, le=100, description="Items per page"),
     name: str | None = Query(None, description="Filter by product name"),
@@ -64,6 +81,7 @@ def list_products(
 ):
     """
     Retrieves a paginated list of products for the authenticated tenant.
+    Allows a higher request rate for read-only operations.
     """
     return ProductService.get_paginated_products(
         db=db,
@@ -73,8 +91,11 @@ def list_products(
         name_filter=name
     )
 
+
 @router.post("/{product_id}/image", response_model=ProductResponse)
+@limiter.limit("30/minute", key_func=user_token_key)
 async def upload_product_image(
+    request: Request,
     product_id: UUID,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -82,6 +103,7 @@ async def upload_product_image(
 ):
     """
     Uploads a main image for a specific product securely.
+    Strictly rate-limited due to I/O and storage constraints.
     """
     image_url = await StorageService.save_product_image(file, str(current_user.tenant_id))
     
@@ -100,8 +122,11 @@ async def upload_product_image(
         
     return updated_product
 
+
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("60/minute", key_func=user_token_key)
 def delete_product(
+    request: Request,
     product_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)

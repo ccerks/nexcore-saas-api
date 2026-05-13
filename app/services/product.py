@@ -1,4 +1,6 @@
 import math
+import json
+import pika
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from uuid import UUID
@@ -10,7 +12,7 @@ from app.services.audit import AuditService
 class ProductService:
     
     @staticmethod
-    def create(db: Session, product_in: ProductCreate, tenant_id: UUID, user_id: UUID) -> Product:
+    def create(db: Session, product_in: ProductCreate, tenant_id: UUID, user_id: UUID) -> Product | None:
         existing_product = ProductService.get_by_sku(
             db=db, tenant_id=tenant_id, sku_pai=product_in.sku_pai, sku_filho=product_in.sku_filho, include_deleted=True
         )
@@ -68,12 +70,45 @@ class ProductService:
 
     @staticmethod
     def update_image_url(db: Session, product_id: UUID, tenant_id: UUID, image_url: str) -> Product | None:
-        product = db.query(Product).filter(Product.id == product_id, Product.tenant_id == tenant_id, Product.deleted_at == None).first()
+        """
+        Updates the product image and dispatches a background event to remove the orphaned file.
+        """
+        product = db.query(Product).filter(
+            Product.id == product_id, 
+            Product.tenant_id == tenant_id, 
+            Product.deleted_at == None
+        ).first()
+        
         if not product:
             return None
+            
+        old_image_url = product.image_url
         product.image_url = image_url
         db.commit()
         db.refresh(product)
+        
+        # Event-Driven Architecture: Dispatch cleanup task to RabbitMQ
+        if old_image_url and old_image_url != image_url:
+            try:
+                connection = pika.BlockingConnection(pika.ConnectionParameters(host='rabbitmq'))
+                channel = connection.channel()
+                channel.queue_declare(queue='nexcore_tasks', durable=True)
+                
+                payload = {
+                    "action": "delete_image",
+                    "data": {"file_path": old_image_url}
+                }
+                
+                channel.basic_publish(
+                    exchange='',
+                    routing_key='nexcore_tasks',
+                    body=json.dumps(payload),
+                    properties=pika.BasicProperties(delivery_mode=2)
+                )
+                connection.close()
+            except Exception as e:
+                print(f"Failed to queue image for deletion: {e}")
+
         return product
     
     @staticmethod
@@ -89,11 +124,19 @@ class ProductService:
             
         product.deleted_at = datetime.now(timezone.utc)
         product.last_deleted_by = user_id
-        
-        # Strict assignment to prevent NoneType += errors on legacy data
         product.deactivation_count = (product.deactivation_count or 0) + 1
         
         db.flush()
+
+        from app.services.messenger import MessengerService
+        MessengerService.send_notification({
+            "event": "PRODUCT_DELETED",
+            "tenant_id": str(tenant_id),
+            "product_name": product.name,
+            "sku": product.sku_pai,
+            "deleted_by": str(user_id)
+        })
+        
         AuditService.log_action(db, tenant_id, user_id, "DELETE", "Product", str(product.id), {"status": "soft_deleted"})
         db.commit()
         return True

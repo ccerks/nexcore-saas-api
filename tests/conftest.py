@@ -10,8 +10,6 @@ from app.db.session import get_db
 from app.models import Base
 from app.core.config import settings
 
-# Dynamically builds the test database URL using credentials from the .env file.
-# Slices the original URL at the last '/' and appends the test database name.
 base_url = settings.DATABASE_URL.rsplit("/", 1)[0]
 SQLALCHEMY_DATABASE_URL = f"{base_url}/nexcore_test"
 
@@ -20,9 +18,6 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_db():
-    """
-    Creates a clean test database and tables before the test session starts.
-    """
     if not database_exists(engine.url):
         create_database(engine.url)
     
@@ -32,10 +27,6 @@ def setup_test_db():
 
 @pytest.fixture
 def db() -> Generator:
-    """
-    Provides a transactional database session for each test.
-    Rolls back changes after each test to maintain isolation.
-    """
     connection = engine.connect()
     transaction = connection.begin()
     session = TestingSessionLocal(bind=connection)
@@ -48,9 +39,6 @@ def db() -> Generator:
 
 @pytest.fixture
 def client(db) -> Generator:
-    """
-    Overrides the database dependency and returns a TestClient.
-    """
     def _get_test_db():
         try:
             yield db

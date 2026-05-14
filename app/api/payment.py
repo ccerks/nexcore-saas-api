@@ -2,22 +2,15 @@ from fastapi import APIRouter, Request, HTTPException, Header, Depends
 from sqlalchemy.orm import Session
 import stripe
 
-# Webhook
 from app.core.config import settings
 from app.db.session import get_db
 from app.services.tenant import TenantService
-
-#Chekout
 from app.api.deps import get_current_user
 from app.models.user import User
 from app.schemas.payment import CheckoutSessionRequest, CheckoutSessionResponse
 from app.services.stripe_service import StripeService
 
 router = APIRouter()
-
-# ... (aqui embaixo continua o seu código do @router.post("/webhook") intacto) ...
-
-# ... (e depois do webhook, você cola a nova rota @router.post("/checkout")) ...
 
 @router.post("/webhook")
 async def stripe_webhook(
@@ -40,19 +33,18 @@ async def stripe_webhook(
             sig_header=stripe_signature,
             secret=settings.STRIPE_WEBHOOK_SECRET
         )
-    except stripe.error.SignatureVerificationError as e:
+    except stripe.error.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Invalid cryptographic signature")
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(status_code=400, detail="Invalid payload format")
 
-    event_type = event['type']
+    event_type = event.get('type')
     
     if event_type == 'customer.created':
         customer = event['data']['object']
-        print(f"✅ [WEBHOOK] Customer {customer['id']} provisioned successfully.")
+        print(f"✅ [WEBHOOK] Customer {customer.get('id')} provisioned successfully.")
         
-    elif event_type == 'customer.deleted' or event_type == 'customer.subscription.deleted':
-        # The object varies slightly depending on the event, but both contain the customer ID
+    elif event_type in ['customer.deleted', 'customer.subscription.deleted']:
         obj = event['data']['object']
         stripe_customer_id = obj.get('customer') if event_type == 'customer.subscription.deleted' else obj.get('id')
         
@@ -68,6 +60,8 @@ async def stripe_webhook(
         print(f"⚠️ [WEBHOOK] Unhandled event type: {event_type}")
 
     return {"status": "success"}
+
+
 @router.post("/checkout", response_model=CheckoutSessionResponse)
 def create_checkout(
     request: CheckoutSessionRequest,

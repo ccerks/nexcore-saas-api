@@ -7,9 +7,14 @@ from app.db.session import Base
 
 class User(Base):
     __tablename__ = "users"
+    
+    # Binds the model strictly to the global 'public' schema
+    __table_args__ = {'schema': 'public'}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    
+    # Cross-schema mapping: Explicitly points to public.tenants
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("public.tenants.id", ondelete="CASCADE"), nullable=False)
     
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
@@ -18,5 +23,4 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    # Bidirectional relationship
     tenant = relationship("Tenant", back_populates="users")

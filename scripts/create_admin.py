@@ -15,45 +15,43 @@ from app.services.tenant import TenantService
 def create_master_user():
     """
     Bootstrap script to provision the initial administrative user.
-    If no Tenant exists, it automatically provisions a master tenant first.
-    Ensures execution context is safely set to the 'public' schema.
+    Uses 'public' schema context for global consistency.
     """
     db = SessionLocal()
     try:
-        # Force the execution context to 'public' for global entities
+        # Crucial: Enforce 'public' schema context for Global Entities
         db.execute(text('SET search_path TO "public"'))
         
-        admin_email = "admin@nexcore.com" # Change to your desired admin email
+        admin_email = "admin1@nexcore.com"
         
-        # Prevent duplicate admin provisioning
+        # Check for existing admin to maintain idempotency
         if UserService.get_by_email(db, email=admin_email):
             print(f"Info: User {admin_email} already exists.")
             return
 
-        # Fetch the default tenant, or create it if the DB is completely empty
+        # Fetch or Create the Master Tenant
         tenant = db.query(Tenant).first()
         
         if not tenant:
             print("Info: No Tenant found. Provisioning the default Master Tenant...")
             tenant_in = TenantCreate(name="NexCore Master", slug="nexcore-master")
-            # This triggers Stripe integration and Dedicated Schema creation (DDL)
+            # TenantService.create handles both 'public' entry and 'dedicated' schema creation
             tenant = TenantService.create(db, tenant_in=tenant_in)
-            print("Success: Master Tenant created with Dedicated Schema.")
+            print(f"Success: Master Tenant created with ID: {tenant.id}")
 
-        # Re-ensure 'public' schema just in case TenantService altered the session state
+        # Re-verify 'public' context before User insertion
         db.execute(text('SET search_path TO "public"'))
 
-        # Provision the Admin User tied to the Tenant
         admin_in = UserCreate(
-            tenant_id=tenant.id,
+            tenant_id=tenant.id, # Valid UUID from public.tenants
             email=admin_email,
-            password="SecurePassword123!", # Change this before production
+            password="SecurePassword123!",
             full_name="NexCore System Admin",
             role="admin" 
         )
         
         UserService.create(db, user_in=admin_in)
-        print(f"Success: Admin user {admin_email} provisioned.")
+        print(f"Success: Admin user {admin_email} provisioned in public.users.")
         
     except Exception as e:
         print(f"Error during master user creation: {e}")

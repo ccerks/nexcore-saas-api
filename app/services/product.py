@@ -1,7 +1,7 @@
 import math
 import json
 import pika
-from typing import List
+from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -10,29 +10,35 @@ from uuid import UUID
 from app.models.product import Product
 from app.schemas.product import ProductCreate
 from app.services.audit import AuditService
+from app.services.messenger import MessengerService
 
 class ProductService:
     
     @staticmethod
-    def create(db: Session, product_in: ProductCreate, tenant_id: UUID, user_id: UUID) -> Product | None:
-        existing_product = ProductService.get_by_sku(
-            db=db, tenant_id=tenant_id, sku_pai=product_in.sku_pai, sku_filho=product_in.sku_filho, include_deleted=True
+    def create(db: Session, product_in: ProductCreate, tenant_id: UUID, user_id: UUID) -> Optional[Product]:
+        """
+        Creates or restores a product. Validates SKU uniqueness within the tenant's isolated schema.
+        """
+        existing = ProductService.get_by_sku(
+            db=db, tenant_id=tenant_id, sku_pai=product_in.sku_pai, 
+            sku_filho=product_in.sku_filho, include_deleted=True
         )
         
-        if existing_product:
-            if existing_product.deleted_at is None:
+        if existing:
+            if existing.deleted_at is None:
                 return None 
             
-            for key, value in product_in.model_dump().items():
-                setattr(existing_product, key, value)
+            # Restore soft-deleted record
+            for key, value in product_in.model_dump(exclude_unset=True).items():
+                setattr(existing, key, value)
             
-            existing_product.deleted_at = None
+            existing.deleted_at = None
             db.flush()
             
-            AuditService.log_action(db, tenant_id, user_id, "RESTORE_AND_UPDATE", "Product", str(existing_product.id), product_in.model_dump())
+            AuditService.log_action(db, tenant_id, user_id, "RESTORE", "Product", str(existing.id), product_in.model_dump())
             db.commit()
-            db.refresh(existing_product)
-            return existing_product
+            db.refresh(existing)
+            return existing
 
         db_product = Product(**product_in.model_dump(), tenant_id=tenant_id)
         db.add(db_product)
@@ -44,66 +50,33 @@ class ProductService:
         return db_product
 
     @classmethod
-    def bulk_create(cls, db: Session, products_in: List[ProductCreate], tenant_id: UUID, user_id: UUID) -> List[Product] | None:
+    def bulk_create(cls, db: Session, products_in: List[ProductCreate], tenant_id: UUID, user_id: UUID) -> Optional[List[Product]]:
         """
-        Processes a bulk insertion of products using an atomic transaction.
-        Rolls back the entire batch if an IntegrityError (e.g., duplicate SKU) occurs.
+        Processes atomic batch insertion of products.
         """
         try:
-            db_products = []
-            for p_in in products_in:
-                product_data = p_in.model_dump(exclude_unset=True)
-                db_product = Product(**product_data, tenant_id=tenant_id)
-                db_products.append(db_product)
-
+            db_products = [Product(**p.model_dump(), tenant_id=tenant_id) for p in products_in]
             db.add_all(db_products)
-            db.commit()
+            db.flush()
 
             for product in db_products:
-                db.refresh(product)
-                
-            return db_products
+                AuditService.log_action(db, tenant_id, user_id, "BULK_CREATE", "Product", str(product.id))
             
+            db.commit()
+            for product in db_products:
+                db.refresh(product)
+            return db_products
         except IntegrityError:
             db.rollback()
             return None
 
     @staticmethod
-    def get_paginated_products(db: Session, tenant_id: UUID, page: int = 1, size: int = 20, name_filter: str | None = None) -> dict:
-        query = db.query(Product).filter(Product.tenant_id == tenant_id, Product.deleted_at == None)
-
-        if name_filter:
-            query = query.filter(Product.name.ilike(f"%{name_filter}%"))
-
-        total_records = query.count()
-        total_pages = math.ceil(total_records / size) if total_records > 0 else 1
-        
-        offset_value = (page - 1) * size
-        products = query.offset(offset_value).limit(size).all()
-
-        return {"items": products, "total": total_records, "page": page, "size": size, "pages": total_pages}
-
-    @staticmethod
-    def get_by_sku(db: Session, tenant_id: UUID, sku_pai: str, sku_filho: str | None = None, include_deleted: bool = False) -> Product | None:
-        query = db.query(Product).filter(Product.tenant_id == tenant_id, Product.sku_pai == sku_pai)
-        
-        if not include_deleted:
-            query = query.filter(Product.deleted_at == None)
-            
-        if sku_filho:
-            query = query.filter(Product.sku_filho == sku_filho)
-            
-        return query.first()
-
-    @staticmethod
-    def update_image_url(db: Session, product_id: UUID, tenant_id: UUID, image_url: str) -> Product | None:
+    def update_image_url(db: Session, product_id: UUID, tenant_id: UUID, image_url: str) -> Optional[Product]:
         """
-        Updates the product image and dispatches a background event to remove the orphaned file.
+        Updates image and dispatches background task to RabbitMQ for orphaned file cleanup.
         """
         product = db.query(Product).filter(
-            Product.id == product_id, 
-            Product.tenant_id == tenant_id, 
-            Product.deleted_at == None
+            Product.id == product_id, Product.tenant_id == tenant_id, Product.deleted_at == None
         ).first()
         
         if not product:
@@ -115,34 +88,33 @@ class ProductService:
         db.refresh(product)
         
         if old_image_url and old_image_url != image_url:
-            try:
-                connection = pika.BlockingConnection(pika.ConnectionParameters(host='rabbitmq'))
-                channel = connection.channel()
-                channel.queue_declare(queue='nexcore_tasks', durable=True)
-                
-                payload = {
-                    "action": "delete_image",
-                    "data": {"file_path": old_image_url}
-                }
-                
-                channel.basic_publish(
-                    exchange='',
-                    routing_key='nexcore_tasks',
-                    body=json.dumps(payload),
-                    properties=pika.BasicProperties(delivery_mode=2)
-                )
-                connection.close()
-            except Exception as e:
-                print(f"Failed to queue image for deletion: {e}")
+            ProductService._dispatch_image_cleanup(old_image_url)
 
         return product
-    
+
+    @staticmethod
+    def _dispatch_image_cleanup(file_path: str) -> None:
+        """Internal helper to manage RabbitMQ task queuing."""
+        try:
+            connection = pika.BlockingConnection(pika.ConnectionParameters(host='rabbitmq'))
+            channel = connection.channel()
+            channel.queue_declare(queue='nexcore_tasks', durable=True)
+            
+            payload = {"action": "delete_image", "data": {"file_path": file_path}}
+            channel.basic_publish(
+                exchange='', routing_key='nexcore_tasks',
+                body=json.dumps(payload),
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+            connection.close()
+        except Exception as e:
+            print(f"MQ Error: {e}")
+
     @staticmethod
     def delete(db: Session, product_id: UUID, tenant_id: UUID, user_id: UUID) -> bool:
+        """Performs soft delete and triggers external notifications."""
         product = db.query(Product).filter(
-            Product.id == product_id, 
-            Product.tenant_id == tenant_id, 
-            Product.deleted_at == None
+            Product.id == product_id, Product.tenant_id == tenant_id, Product.deleted_at == None
         ).first()
 
         if not product:
@@ -151,18 +123,33 @@ class ProductService:
         product.deleted_at = datetime.now(timezone.utc)
         product.last_deleted_by = user_id
         product.deactivation_count = (product.deactivation_count or 0) + 1
-        
         db.flush()
 
-        from app.services.messenger import MessengerService
         MessengerService.send_notification({
-            "event": "PRODUCT_DELETED",
-            "tenant_id": str(tenant_id),
-            "product_name": product.name,
-            "sku": product.sku_pai,
-            "deleted_by": str(user_id)
+            "event": "PRODUCT_DELETED", "tenant_id": str(tenant_id),
+            "product_name": product.name, "sku": product.sku_pai, "deleted_by": str(user_id)
         })
         
-        AuditService.log_action(db, tenant_id, user_id, "DELETE", "Product", str(product.id), {"status": "soft_deleted"})
+        AuditService.log_action(db, tenant_id, user_id, "DELETE", "Product", str(product.id))
         db.commit()
         return True
+
+    @staticmethod
+    def get_paginated_products(db: Session, tenant_id: UUID, page: int = 1, size: int = 20, name_filter: str = None) -> dict:
+        query = db.query(Product).filter(Product.tenant_id == tenant_id, Product.deleted_at == None)
+        if name_filter:
+            query = query.filter(Product.name.ilike(f"%{name_filter}%"))
+
+        total = query.count()
+        pages = math.ceil(total / size) if total > 0 else 1
+        items = query.offset((page - 1) * size).limit(size).all()
+        return {"items": items, "total": total, "page": page, "size": size, "pages": pages}
+
+    @staticmethod
+    def get_by_sku(db: Session, tenant_id: UUID, sku_pai: str, sku_filho: str = None, include_deleted: bool = False) -> Optional[Product]:
+        query = db.query(Product).filter(Product.tenant_id == tenant_id, Product.sku_pai == sku_pai)
+        if not include_deleted:
+            query = query.filter(Product.deleted_at == None)
+        if sku_filho:
+            query = query.filter(Product.sku_filho == sku_filho)
+        return query.first()

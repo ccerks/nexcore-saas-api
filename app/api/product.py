@@ -28,8 +28,9 @@ def create_product(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Architectural Fix: Explicit raw SQL query targeting the global 'public' schema.
-    # Bypasses ORM schema resolution and avoids empty shadow clones in the dedicated schema.
+    """
+    Creates a product. Enforces Free Tier limits using cross-schema raw SQL.
+    """
     tenant_record = db.execute(
         text("SELECT stripe_subscription_id FROM public.tenants WHERE id = :tid"),
         {"tid": str(current_user.tenant_id)}
@@ -73,7 +74,9 @@ def bulk_create_products(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Cross-schema raw query lookup
+    """
+    Processes batch insertion of products while enforcing tier limits.
+    """
     tenant_record = db.execute(
         text("SELECT stripe_subscription_id FROM public.tenants WHERE id = :tid"),
         {"tid": str(current_user.tenant_id)}

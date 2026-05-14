@@ -1,5 +1,6 @@
 # NexCore SaaS API 🚀
 
+![Version](https://img.shields.io/badge/version-2.0.0--beta-blue.svg)
 ![Python](https://img.shields.io/badge/Python-3.10+-blue.svg?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-005571?logo=fastapi)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?logo=postgresql&logoColor=white)
@@ -7,34 +8,37 @@
 ![RabbitMQ](https://img.shields.io/badge/RabbitMQ-FF6600?logo=rabbitmq&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
 ![Stripe](https://img.shields.io/badge/Stripe-626CD9?logo=Stripe&logoColor=white)
-![Pytest](https://img.shields.io/badge/Pytest-Certified-brightgreen.svg?logo=pytest)
 
-NexCore is a robust, production-ready Multi-Tenant SaaS backend built with **FastAPI**, **PostgreSQL**, and **Redis**. It was designed with a focus on high scalability, data isolation, and modern security patterns.
+NexCore is a robust, production-ready Multi-Tenant SaaS backend. In version 2.0.0, the architecture was upgraded to an **Enterprise Dedicated Schema** model, ensuring absolute physical data isolation, asynchronous performance tuning, and event-driven background processing.
 
 ## 🏗️ Architecture & Stack
 - **Framework:** [FastAPI](https://fastapi.tiangolo.com/) (Async, Type Safety, OpenAPI)
 - **Database:** [PostgreSQL](https://www.postgresql.org/) with [SQLAlchemy 2.0](https://www.sqlalchemy.org/)
-- **Testing:** [Pytest](https://docs.pytest.org/) & [Faker](https://faker.readthedocs.io/) (TDD Approach)
-- **Migrations:** [Alembic](https://alembic.sqlalchemy.org/)
+- **Multi-Tenancy:** Dedicated PostgreSQL Schemas (Physical Isolation)
+- **Migrations:** [Alembic](https://alembic.sqlalchemy.org/) (Dynamic Schema Routing)
 - **Cache & Rate Limiting:** [Redis](https://redis.io/)
 - **Message Broker:** [RabbitMQ](https://www.rabbitmq.com/) (Event-Driven Background Tasks)
+- **Async I/O Storage:** `aiofiles` for non-blocking media handling
 - **Containerization:** [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/)
 - **Validation:** [Pydantic V2](https://docs.pydantic.dev/)
-- **Security:** JWT Authentication & PostgreSQL Row-Level Security (RLS) on a Shared Schema
+- **Security:** JWT Authentication & Cross-Schema SQL Sniper Queries
 - **Payments:** [Stripe Python SDK](https://stripe.com/docs/api)
 
-### 🗄️ Database Entity-Relationship (Multi-Tenant Isolation)
-We utilize a **Shared Schema** approach where all Tenants reside in the same database but are logically isolated.
+### 🗄️ Database Entity-Relationship (Physical Schema Isolation)
+NexCore utilizes a strict multi-dimensional database topology. Global entities reside in the `public` schema, while each tenant gets a dynamically provisioned isolated schema (`tenant_<slug>`). Foreign keys securely cross these boundaries.
 
 ```mermaid
 erDiagram
-    TENANTS ||--o{ USERS : "has"
-    TENANTS ||--o{ PRODUCTS : "manages"
-    TENANTS ||--o{ AUDIT_LOGS : "has records"
-    USERS ||--o{ AUDIT_LOGS : "performs"
-    PRODUCTS ||--o{ PRODUCTS : "parent/child (variations)"
+    %% GLOBAL MAP (public schema)
+    public_TENANTS ||--o{ public_USERS : "has"
+    
+    %% ISOLATED ZONES (tenant_* schemas)
+    public_TENANTS ||--o{ tenant_PRODUCTS : "manages"
+    public_TENANTS ||--o{ tenant_AUDIT_LOGS : "has records"
+    public_USERS ||--o{ tenant_AUDIT_LOGS : "performs"
+    tenant_PRODUCTS ||--o{ tenant_PRODUCTS : "parent/child (variations)"
 
-    TENANTS {
+    public_TENANTS {
         uuid id PK
         string name
         string slug
@@ -43,16 +47,16 @@ erDiagram
         string stripe_subscription_id "Billing"
     }
 
-    USERS {
+    public_USERS {
         uuid id PK
-        uuid tenant_id FK "Data Isolation"
+        uuid tenant_id FK "Global Identity Anchor"
         string email
         string role
     }
 
-    PRODUCTS {
+    tenant_PRODUCTS {
         uuid id PK
-        uuid tenant_id FK "Data Isolation"
+        uuid tenant_id FK "Cross-Schema Ref"
         uuid parent_id FK "SKU Variations"
         string name
         string sku_pai
@@ -60,38 +64,27 @@ erDiagram
         json attributes
         float price
         datetime deleted_at "Soft Delete"
-        uuid last_deleted_by FK
-        int deactivation_count "History"
     }
 
-    AUDIT_LOGS {
+    tenant_AUDIT_LOGS {
         uuid id PK
-        uuid tenant_id FK "Data Isolation"
-        uuid user_id FK "Actor"
+        uuid tenant_id FK "Cross-Schema Ref"
+        uuid user_id FK "Actor Ref"
         string action "CREATE/UPDATE/DELETE"
         string entity_name
-        string entity_id
         json changes "Snapshot"
-        datetime created_at
     }
 ```
 
 ## 🌟 Key Features
-- **Multi-tenancy:** Efficient data isolation using tenant_id pattern and Row-Level Security (RLS).
-- **Payment Gateway & Billing:** Stripe SDK integration for customer provisioning using Atomic Database Transactions (Flush/Rollback), paired with a secure Webhook listener for real-time churn control and automated tenant deactivation.
-- **High-Performance Ingestion (Bulk Insert):** Atomic batch processing for product catalogs, ensuring database integrity with automatic full-batch rollbacks on SKU conflicts.
-- **Event-Driven Architecture:** Asynchronous background task processing using RabbitMQ (e.g., orphaned image cleanup) to guarantee low-latency HTTP responses.
-- **Advanced Catalog:** Complex product management supporting hierarchical SKU variations (parent/child relationships) and JSON-based dynamic attributes.
-- **Secure Storage:** Managed multipart file uploads for product images, with UUID-based renaming and protected static serving.
-- **Automated QA (TDD):** Full testing suite with Pytest using a dynamic PostgreSQL test database factory. Data generation powered by Faker.
-- **Audit & Traceability:** Immutable audit logging for critical entity actions, safely stored via atomic transactions.
-- **Data Retention & Soft Deletion:** Logical deletion pattern ensuring database referential integrity, coupled with historical metadata tracking.
-- **Backend-For-Frontend (BFF):** Aggregated dashboard metrics endpoint designed to reduce client-side network round-trips and optimize initial load times.
-- **UUIDs:** All entities use UUID v4 for enhanced security and non-predictable IDs.
-- **Automated Migrations:** Database versioning with Alembic.
-- **Clean Architecture:** Organized structure for easy maintenance and scaling.
-- **Interactive API Docs:** Auto-generated Swagger and ReDoc.
-- **Performance & Observability:** Global rate limiting using the Sliding Window Counter algorithm via Redis Lua scripts (SlowAPI) to mitigate brute-force attacks. Paginated endpoints for large catalogs. Centralized exception handler that sanitizes client responses and dispatches real-time stack traces to a Discord webhook.
+- **Enterprise Multi-tenancy:** Physical data isolation via dynamically generated PostgreSQL schemas per tenant. Prevents data leakage at the database engine level.
+- **Cross-Schema Validation:** Employs raw SQL "Sniper Queries" to validate global states (e.g., Free Tier limits) directly from the `public` schema without losing the tenant's transaction context.
+- **Event-Driven Architecture:** Asynchronous background task processing using RabbitMQ (e.g., orphaned image cleanup and Discord Webhooks) to guarantee non-blocking HTTP responses.
+- **Asynchronous Storage I/O:** Utilizes `aiofiles` for true async multipart file uploads, protecting the FastAPI event loop during heavy disk writes.
+- **Payment Gateway & Billing:** Stripe SDK integration using Atomic Database Transactions, paired with a secure Webhook listener.
+- **High-Performance Ingestion (Bulk Insert):** Atomic batch processing for catalogs.
+- **Audit & Traceability:** Immutable audit logging stored safely within the tenant's isolated dimension.
+- **Performance & Observability:** Global rate limiting using the Sliding Window Counter algorithm via Redis. Centralized exception handler that sanitizes responses and dispatches real-time stack traces to Discord.
 
 ## 🚀 Getting Started
 
@@ -102,7 +95,7 @@ erDiagram
 ### Installation
 1. Clone the repository:
    ```bash
-   git clone https://github.com/ccerks/nexcore-saas-api.git
+   git clone [https://github.com/ccerks/nexcore-saas-api.git](https://github.com/ccerks/nexcore-saas-api.git)
    cd nexcore-saas-api
    ```
 2. Configure environment variables:
@@ -113,58 +106,26 @@ erDiagram
    ```bash
    docker-compose up --build -d
    ```
-4. Run migrations:
+4. Run migrations (This creates the global schema architecture):
    ```bash
    docker-compose exec api alembic upgrade head
    ```
-The API will be available at http://localhost:8000
-Check the docs at http://localhost:8000/docs
+5. Provision the initial Administrator:
+   ```bash
+   docker-compose exec api python scripts/create_admin.py
+   ```
 
-### 🧪 Running Tests
-The project includes a dedicated Test Environment with an isolated database. To run the automated tests:
-```bash
-docker compose exec api python -m pytest tests/
-```
+The API will be available at `http://localhost:8000`
+Check the interactive docs at `http://localhost:8000/docs`
 
 ## 💳 Stripe Setup & Local Testing
-To handle real-time billing events (Webhooks) during development, follow these steps:
+To handle real-time billing events (Webhooks) during development:
 
-1. **Configure API Keys:** Ensure your `.env` contains:
-   - `STRIPE_SECRET_KEY`: Your Stripe Secret Key (sk_test_...).
-   - `STRIPE_WEBHOOK_SECRET`: The secret generated by the Stripe CLI (whsec_...).
-
-2. **Install Stripe CLI:** Download the official [Stripe CLI](https://github.com/stripe/stripe-cli/releases) and place the executable in the project root.
-
-3. **Start the Webhook Tunnel:**
-   Open a terminal and run the "PSS Radar":
+1. **Configure API Keys:** Add your `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` to `.env`.
+2. **Start the Webhook Tunnel:** Use the Stripe CLI to forward events:
    ```bash
-   ./stripe listen --forward-to localhost:8000/api/v1/payments/webhook
+   stripe listen --forward-to localhost:8000/api/v1/payments/webhook
    ```
-
-4. **Trigger Test Events:**
-   ```bash
-   ./stripe trigger customer.subscription.deleted
-   ```
-
-## 📡 Observability & Monitoring
-The system features a Global Exception Handler that monitors the health of the API in real-time.
-
-- **Discord Integration:** Any `500 Internal Server Error` triggers an automated alert via Webhook.
-- **Payload Sanitization:** While the engineering team receives the full stack trace on Discord, the end-user only sees a sanitized, secure error message to prevent information leakage.
-
-## 🛠️ Project Structure
-```text
-  app/
-  ├── api/         # Route handlers (Endpoints)
-  ├── core/        # Global configs (Security, JWT, Env)
-  ├── db/          # Session management & engine
-  ├── models/      # SQLAlchemy database models
-  ├── schemas/     # Pydantic data contracts
-  ├── services/    # Business logic (Service layer)
-tests/             # Automated test suite (Pytest + Faker)
-scripts/
-  └── create_admin.py # Utility for initial system setup
-```
 
 ## 🗺️ Development Roadmap
 
@@ -174,31 +135,26 @@ scripts/
   - [x] PostgreSQL & Redis integration
   - [x] Alembic migrations setup
         
-- [x] **Phase 2: Identity & Multi-Tenancy**
-  - [x] Tenant model and isolation logic
-  - [x] User model and relational mapping
-  - [x] JWT Authentication (Access & Refresh tokens)
-  - [x] Role-Based Access Control (RBAC)
+- [x] **Phase 2: Identity & Base Multi-Tenancy**
+  - [x] Tenant and User models
+  - [x] JWT Authentication & RBAC
         
 - [x] **Phase 3: E-commerce & Payments Core**
-  - [x] Product and Inventory models per Tenant
+  - [x] Product and Inventory models
   - [x] Bulk Insert functionality (Horde Encounters)
-  - [x] Stripe API integration for subscription billing
-  - [x] Webhook listener for async payment events
+  - [x] Stripe API integration & Webhook listener
   - [x] Secure File/Image Storage handling
         
 - [x] **Phase 4: Performance & Observability**
   - [x] Advanced Rate Limiting with Redis
-  - [x] Paginated endpoints for resource lists
   - [x] Global exception handling and Discord alerts
-  - [x] CI/CD Pipeline (GitHub Actions)
   - [x] Automated Testing Suite (Pytest + Faker)
 
-- [x] **Phase 5: Enterprise & Advanced Integrations**
-  - [x] Tenant-level audit logging
-  - [x] Advanced Data Retention (Soft Delete & Historical Tracking)
-  - [x] Executive Dashboard (BFF Aggregation)
-  - [x] Asynchronous messaging and notifications via RabbitMQ
-  - [ ] Physical database isolation strategies (Dedicated Schemas)
+- [x] **Phase 5: Enterprise Architecture (v2.0.0)**
+  - [x] Physical database isolation strategies (Dedicated Schemas)
+  - [x] Alembic dynamic routing logic (`include_object`)
+  - [x] Asynchronous Storage I/O (`aiofiles`)
+  - [x] Asynchronous messaging via RabbitMQ
+  - [x] Tenant-level isolated audit logging
 
 **Developed by** [Caio Cerqueira](https://github.com/ccerks) 🚀

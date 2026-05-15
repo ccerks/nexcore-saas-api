@@ -8,6 +8,7 @@
 ![RabbitMQ](https://img.shields.io/badge/RabbitMQ-FF6600?logo=rabbitmq&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
 ![Stripe](https://img.shields.io/badge/Stripe-626CD9?logo=Stripe&logoColor=white)
+![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub_Actions-2088FF?logo=githubactions&logoColor=white)
 
 NexCore is a robust, production-ready Multi-Tenant SaaS backend. In version 2.0.0, the architecture was upgraded to an **Enterprise Dedicated Schema** model, ensuring absolute physical data isolation, asynchronous performance tuning, and event-driven background processing.
 
@@ -23,6 +24,7 @@ NexCore is a robust, production-ready Multi-Tenant SaaS backend. In version 2.0.
 - **Validation:** [Pydantic V2](https://docs.pydantic.dev/)
 - **Security:** JWT Authentication & Cross-Schema SQL Sniper Queries
 - **Payments:** [Stripe Python SDK](https://stripe.com/docs/api)
+- **CI/CD Pipeline:** GitHub Actions with ephemeral database provisioning and automated testing.
 
 ### 🗄️ Database Entity-Relationship (Physical Schema Isolation)
 NexCore utilizes a strict multi-dimensional database topology. Global entities reside in the `public` schema, while each tenant gets a dynamically provisioned isolated schema (`tenant_<slug>`). Foreign keys securely cross these boundaries.
@@ -79,6 +81,7 @@ erDiagram
 ## 🌟 Key Features
 - **Enterprise Multi-tenancy:** Physical data isolation via dynamically generated PostgreSQL schemas per tenant. Prevents data leakage at the database engine level.
 - **Cross-Schema Validation:** Employs raw SQL "Sniper Queries" to validate global states (e.g., Free Tier limits) directly from the `public` schema without losing the tenant's transaction context.
+- **Backend for Frontend (BFF) Aggregation:** Optimized dashboard endpoints that perform heavy mathematical aggregations directly on the PostgreSQL engine, returning real-time executive summaries with zero application memory overhead.
 - **Event-Driven Architecture:** Asynchronous background task processing using RabbitMQ (e.g., orphaned image cleanup and Discord Webhooks) to guarantee non-blocking HTTP responses.
 - **Asynchronous Storage I/O:** Utilizes `aiofiles` for true async multipart file uploads, protecting the FastAPI event loop during heavy disk writes.
 - **Payment Gateway & Billing:** Stripe SDK integration using Atomic Database Transactions, paired with a secure Webhook listener.
@@ -95,7 +98,7 @@ erDiagram
 ### Installation
 1. Clone the repository:
    ```bash
-   git clone [https://github.com/ccerks/nexcore-saas-api.git](https://github.com/ccerks/nexcore-saas-api.git)
+   git clone https://github.com/ccerks/nexcore-saas-api.git
    cd nexcore-saas-api
    ```
 2. Configure environment variables:
@@ -148,6 +151,7 @@ To handle real-time billing events (Webhooks) during development:
 - [x] **Phase 4: Performance & Observability**
   - [x] Advanced Rate Limiting with Redis
   - [x] Global exception handling and Discord alerts
+  - [x] Backend for Frontend (BFF) Dashboard Analytics
   - [x] Automated Testing Suite (Pytest + Faker)
 
 - [x] **Phase 5: Enterprise Architecture (v2.0.0)**
@@ -156,5 +160,6 @@ To handle real-time billing events (Webhooks) during development:
   - [x] Asynchronous Storage I/O (`aiofiles`)
   - [x] Asynchronous messaging via RabbitMQ
   - [x] Tenant-level isolated audit logging
+  - [x] Continuous Integration Pipeline (GitHub Actions)
 
 **Developed by** [Caio Cerqueira](https://github.com/ccerks) 🚀

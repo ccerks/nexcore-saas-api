@@ -29,21 +29,26 @@ jobs:
         flake8 app --count --select=E9,F63,F7,F82 --show-source --statistics
         flake8 app --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
 
-    - name: Build & Run Infrastructure
+    - name: Build and Run Infrastructure
       run: |
         cp .env.example .env
+        
+        # Architectural Fix: Dynamically inject test database credentials into the CI environment
+        echo "SQLALCHEMY_DATABASE_URL=postgresql://postgres:postgres@db:5432/nexcore_test" >> .env
+        echo "SECRET_KEY=super_secret_ci_testing_key_123" >> .env
+        
         docker compose build
-        docker compose up -d # Sobe o banco, redis e rabbitmq
+        docker compose up -d
 
-    - name: Wait for Database
-      run: sleep 10 # Dá tempo para o PostgreSQL estar pronto para conexões
+    - name: Wait for Database Initialization
+      run: sleep 10
 
-    - name: Run Migrations (Alembic)
+    - name: Execute Migrations (Alembic)
       run: |
-        # Garante que a estrutura global (public) está íntegra
+        # Ensures the global public schema and dynamic routing are intact
         docker compose exec -T api alembic upgrade head
 
     - name: Execute Automated Test Suite (Pytest)
       run: |
-        # Roda os testes (incluindo o de criação de usuário que corrigimos)
+        # Runs isolated tests across endpoints and database layers
         docker compose exec -T api pytest

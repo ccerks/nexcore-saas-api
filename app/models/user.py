@@ -8,6 +8,7 @@ from app.db.session import Base
 class User(Base):
     __tablename__ = "users"
     
+    
     # Binds the model strictly to the global 'public' schema
     __table_args__ = {'schema': 'public'}
 

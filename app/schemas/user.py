@@ -1,15 +1,35 @@
 import re
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, Field
 from uuid import UUID
 from datetime import datetime
 from typing import Optional
 
 class UserCreate(BaseModel):
-    tenant_id:  Optional[UUID] = None
-    email: str
-    password: str
-    full_name: Optional[str] = None
-    role: Optional[str] = "user"
+    tenant_id: Optional[UUID] = Field(
+        None, 
+        description="Optional ID to bind the user to a specific tenant. Secure routes will automatically override this.", 
+        examples=["123e4567-e89b-12d3-a456-426614174000"]
+    )
+    email: str = Field(
+        ..., 
+        description="The corporate or personal email address used for authentication.", 
+        examples=["employee@acme-corp.com"]
+    )
+    password: str = Field(
+        ..., 
+        description="A strong password containing at least 8 characters, one digit, and one uppercase letter or symbol.", 
+        examples=["EnterpriseP@ssw0rd123"]
+    )
+    full_name: Optional[str] = Field(
+        None, 
+        description="The user's full legal or preferred name.", 
+        examples=["John Doe"]
+    )
+    role: Optional[str] = Field(
+        "user", 
+        description="The RBAC role assigned to the user within the tenant's ecosystem.", 
+        examples=["admin"]
+    )
 
     @field_validator('password')
     @classmethod
@@ -19,19 +39,18 @@ class UserCreate(BaseModel):
         if not any(char.isdigit() for char in v):
             raise ValueError('Password must contain at least one digit')
         
-        # Checks if there is at least one uppercase letter OR one special character
         if not any(char.isupper() or not char.isalnum() for char in v):
             raise ValueError('Password must contain at least one uppercase letter or symbol')
         
         return v
 
 class UserResponse(BaseModel):
-    id: UUID
-    tenant_id: UUID
-    email: str
-    full_name: Optional[str] = None
-    role: str
-    is_active: bool
-    created_at: datetime
+    id: UUID = Field(..., description="The unique identifier for the user.")
+    tenant_id: UUID = Field(..., description="The dimension ID linking this user to their workspace.")
+    email: str = Field(..., examples=["employee@acme-corp.com"])
+    full_name: Optional[str] = Field(None, examples=["John Doe"])
+    role: str = Field(..., examples=["admin"])
+    is_active: bool = Field(..., description="Indicates if the user is currently authorized to log in.")
+    created_at: datetime = Field(...)
 
     model_config = ConfigDict(from_attributes=True)

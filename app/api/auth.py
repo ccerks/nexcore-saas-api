@@ -18,8 +18,8 @@ def login(
     form_data: OAuth2PasswordRequestForm = Depends()
 ):
     """
-    Autentica um usuário e retorna o token JWT.
-    Protegido por Rate Limiting (Máximo de 5 tentativas por minuto por IP).
+    Authenticates a user and returns a JWT access token.
+    Protected by Rate Limiting (Maximum of 5 attempts per minute per IP).
     """
     user = UserService.authenticate(db, email=form_data.username, password=form_data.password)
     

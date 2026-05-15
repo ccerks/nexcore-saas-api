@@ -31,17 +31,18 @@ jobs:
 
     - name: Build and Run Infrastructure
       run: |
-        # Architectural Fix: Filter out all database initialization keys to prevent container crash
-        grep -v "^DATABASE_URL=" .env.example | grep -v "^SECRET_KEY=" | grep -v "^POSTGRES_" > .env
+        # Architectural Fix: Filter out ALGORITHM to prevent empty string interpolation
+        grep -v "^DATABASE_URL=" .env.example | grep -v "^SECRET_KEY=" | grep -v "^POSTGRES_" | grep -v "^ALGORITHM=" > .env
         
-        # Inject PostgreSQL boot credentials
+        # Inject Mandatory PostgreSQL boot credentials
         echo "POSTGRES_USER=postgres" >> .env
         echo "POSTGRES_PASSWORD=postgres" >> .env
         echo "POSTGRES_DB=nexcore_test" >> .env
         
-        # Inject API connection credentials
+        # Inject API connection and Security credentials
         echo "DATABASE_URL=postgresql://postgres:postgres@db:5432/nexcore_test" >> .env
         echo "SECRET_KEY=super_secret_ci_testing_key_123" >> .env
+        echo "ALGORITHM=HS256" >> .env
         
         docker compose build
         docker compose up -d

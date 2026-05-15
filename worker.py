@@ -16,16 +16,13 @@ def process_notification(ch: BlockingChannel, method: Basic.Deliver, properties:
     """
     try:
         data = json.loads(body)
-        event_type = data.get("event")
-        
-        if event_type == "PRODUCT_DELETED":
+        if data.get("event") == "PRODUCT_DELETED":
             message = (
                 f"🗑️ **Product Deleted**\n"
                 f"**Store ID:** {data.get('tenant_id')}\n"
                 f"**Item:** {data.get('product_name')} ({data.get('sku')})\n"
                 f"**Actor ID:** {data.get('deleted_by')}"
             )
-            
             response = requests.post(settings.DISCORD_WEBHOOK_URL, json={"content": message}, timeout=5)
             response.raise_for_status()
             print(f" [x] Discord notification sent for {data.get('sku')}")
@@ -41,14 +38,13 @@ def process_task(ch: BlockingChannel, method: Basic.Deliver, properties: BasicPr
     """
     Handles events from the 'nexcore_tasks' queue.
     Translates public URLs to physical internal file paths before deletion.
+    Supports dynamic tenant directories.
     """
     try:
         message = json.loads(body)
-        action = message.get("action")
-        data = message.get("data", {})
-
-        if action == "delete_image":
-            raw_url = data.get("file_path", "")
+        if message.get("action") == "delete_image":
+            raw_url = message.get("data", {}).get("file_path", "")
+            # Architectural Note: Safely translates the URL preserving the dynamic tenant structure
             physical_path = raw_url.replace("/static/", "/app/uploads/")
 
             if physical_path and os.path.exists(physical_path):
@@ -66,14 +62,13 @@ def process_task(ch: BlockingChannel, method: Basic.Deliver, properties: BasicPr
 
 def start_worker() -> None:
     """
-    Initializes the RabbitMQ connection with a robust retry mechanism (Backoff).
+    Initializes the RabbitMQ connection with a robust backoff mechanism.
     Starts consuming from multiple queues concurrently.
     """
     while True:
         try:
             connection = pika.BlockingConnection(pika.ConnectionParameters(host='rabbitmq'))
             channel = connection.channel()
-
             channel.basic_qos(prefetch_count=1)
 
             channel.queue_declare(queue='nexcore_notifications', durable=True)

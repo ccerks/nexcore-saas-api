@@ -1,16 +1,14 @@
 import os
-import shutil
+import aiofiles
 from uuid import uuid4
 from fastapi import UploadFile, HTTPException, status
 
 class StorageService:
     """
-    Handles file uploads and storage. 
-    Currently configured for local disk storage, but abstracted 
-    to easily swap to AWS S3 or other Cloud Storage in the future.
+    Handles asynchronous file uploads and physical storage isolation.
     """
     ALLOWED_EXTENSIONS = {"image/jpeg", "image/png", "image/webp"}
-    UPLOAD_DIR = "uploads/products"
+    BASE_UPLOAD_DIR = "uploads/products"
 
     @staticmethod
     def _validate_image(file: UploadFile) -> None:
@@ -23,18 +21,19 @@ class StorageService:
     @staticmethod
     async def save_product_image(file: UploadFile, tenant_id: str) -> str:
         """
-        Validates, renames, and saves the uploaded image.
-        Returns the relative URL path to access the image.
+        Validates, renames, and asynchronously saves the image to a tenant-specific directory.
         """
         StorageService._validate_image(file)
         
-        os.makedirs(StorageService.UPLOAD_DIR, exist_ok=True)
+        tenant_dir = os.path.join(StorageService.BASE_UPLOAD_DIR, tenant_id)
+        os.makedirs(tenant_dir, exist_ok=True)
         
         file_extension = file.filename.split(".")[-1]
-        secure_filename = f"{tenant_id}_{uuid4().hex}.{file_extension}"
-        file_path = os.path.join(StorageService.UPLOAD_DIR, secure_filename)
+        secure_filename = f"{uuid4().hex}.{file_extension}"
+        file_path = os.path.join(tenant_dir, secure_filename)
 
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        content = await file.read()
+        async with aiofiles.open(file_path, "wb") as buffer:
+            await buffer.write(content)
         
-        return f"/static/products/{secure_filename}"
+        return f"/static/products/{tenant_id}/{secure_filename}"

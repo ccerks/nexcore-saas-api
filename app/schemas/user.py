@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Optional
 
 class UserCreate(BaseModel):
-    tenant_id: UUID
+    tenant_id:  Optional[UUID] = None
     email: str
     password: str
     full_name: Optional[str] = None

@@ -1,5 +1,5 @@
-from pydantic import BaseModel, ConfigDict, field_validator
-from uuid import UUID
+from pydantic import BaseModel, ConfigDict, field_validator, Field
+from uuid import UUID, uuid4
 from typing import Optional, Dict, Any, Union
 
 class ProductBase(BaseModel):
@@ -15,6 +15,9 @@ class ProductBase(BaseModel):
     image_url: str | None = None
 
 class ProductCreate(ProductBase):
+    # Architectural Fix: Enables client-side ID assignment for hierarchical bulk inserts.
+    # Generates a secure UUIDv4 automatically if not provided in the payload.
+    id: Optional[UUID] = Field(default_factory=uuid4)
     parent_id: Optional[UUID] = None
     attributes: Optional[Union[str, Dict[str, Any]]] = None
 

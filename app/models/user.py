@@ -14,7 +14,7 @@ class User(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     
     # Cross-schema mapping: Explicitly points to public.tenants
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("public.tenants.id", ondelete="CASCADE"), nullable=False)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("public.tenants.id", ondelete="CASCADE"))
     
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)

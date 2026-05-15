@@ -1,5 +1,6 @@
 import sys
 import os
+import uuid
 from sqlalchemy import text
 
 # Append project root to python path for module resolution
@@ -8,56 +9,56 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from app.db.session import SessionLocal
 from app.services.user import UserService
 from app.schemas.user import UserCreate
-from app.models.tenant import Tenant
 from app.schemas.tenant import TenantCreate
 from app.services.tenant import TenantService
 
-def create_master_user():
+def provision_isolated_tenant_and_admin() -> None:
     """
-    Bootstrap script to provision the initial administrative user.
-    Uses 'public' schema context for global consistency.
+    Generates a unique Tenant and an exclusive Admin user per execution.
+    Outputs the generated credentials to the console logs for immediate use.
     """
     db = SessionLocal()
     try:
-        # Crucial: Enforce 'public' schema context for Global Entities
         db.execute(text('SET search_path TO "public"'))
         
-        admin_email = "admin1@nexcore.com"
+        # Generate unique identifiers to ensure absolute isolation per run
+        unique_hash = uuid.uuid4().hex[:6]
+        store_name = f"NexCore Store {unique_hash}"
+        slug = f"store-{unique_hash}"
         
-        # Check for existing admin to maintain idempotency
-        if UserService.get_by_email(db, email=admin_email):
-            print(f"Info: User {admin_email} already exists.")
-            return
+        # Identity constraints
+        admin_email = f"admin_{unique_hash}@nexcore.com"
+        raw_password = "SecurePassword123!"
 
-        # Fetch or Create the Master Tenant
-        tenant = db.query(Tenant).first()
+        print(f"[*] Provisioning isolated dimension for: {store_name}...")
+        tenant_in = TenantCreate(name=store_name, slug=slug)
+        tenant = TenantService.create(db, tenant_in=tenant_in)
         
-        if not tenant:
-            print("Info: No Tenant found. Provisioning the default Master Tenant...")
-            tenant_in = TenantCreate(name="NexCore Master", slug="nexcore-master")
-            # TenantService.create handles both 'public' entry and 'dedicated' schema creation
-            tenant = TenantService.create(db, tenant_in=tenant_in)
-            print(f"Success: Master Tenant created with ID: {tenant.id}")
-
-        # Re-verify 'public' context before User insertion
+        # Re-enforce global context before injecting the user
         db.execute(text('SET search_path TO "public"'))
 
+        print(f"[*] Provisioning Admin Anchor: {admin_email}...")
         admin_in = UserCreate(
-            tenant_id=tenant.id, # Valid UUID from public.tenants
+            tenant_id=tenant.id,
             email=admin_email,
-            password="SecurePassword123!",
-            full_name="NexCore System Admin",
-            role="admin" 
+            password=raw_password,
+            full_name=f"Admin {unique_hash}",
+            role="admin"
         )
         
         UserService.create(db, user_in=admin_in)
-        print(f"Success: Admin user {admin_email} provisioned in public.users.")
+        
+        # Post-execution logs (Trainer Card)
+        print("\n[+] Architecture Provisioned Successfully!")
+        print(f"    Tenant Schema : tenant_{slug}")
+        print(f"    Admin Login   : {admin_email}")
+        print(f"    Password      : {raw_password}\n")
         
     except Exception as e:
-        print(f"Error during master user creation: {e}")
+        print(f"[!] Critical failure during provisioning: {e}")
         db.rollback()
     finally:
         db.close()
 
 if __name__ == "__main__":
-    create_master_user()
+    provision_isolated_tenant_and_admin()

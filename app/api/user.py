@@ -10,34 +10,30 @@ from app.core.limiter import limiter
 
 router = APIRouter()
 
-@router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/employee", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
-def create_user(
+def create_employee(
     request: Request, 
     user_in: UserCreate, 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Creates a new user. Enforces 'public' schema context to ensure 
-    global table consistency and valid foreign key referencing.
+    Creates a new user strictly bound to the authenticated admin's tenant.
+    Prevents cross-tenant injection by overriding the payload's tenant_id.
     """
-    # Architectural Safety: Force context to 'public' for global user provisioning
     db.execute(text('SET search_path TO "public"'))
+    
+    # Architectural Shield: Enforce tenant isolation regardless of payload
+    user_in.tenant_id = current_user.tenant_id
     
     if UserService.get_by_email(db, email=user_in.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="Email already registered"
+            detail="Email already registered in the system."
         )
     
-    try:
-        return UserService.create(db, user_in=user_in)
-    except Exception:
-        # Handles cases like the one encountered in Swagger (invalid tenant_id)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid tenant_id. The referenced tenant does not exist in the public record."
-        )
+    return UserService.create(db, user_in=user_in)
 
 @router.get("/me", response_model=UserResponse)
 def read_user_me(current_user: User = Depends(get_current_user)):

@@ -55,4 +55,4 @@ jobs:
 
     - name: Execute Automated Test Suite (Pytest)
       run: |
-        docker compose exec -T api pytest
+        docker compose exec -T api python -m pytest tests/

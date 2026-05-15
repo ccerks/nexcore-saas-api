@@ -13,11 +13,16 @@ from app.services.audit import AuditService
 from app.services.messenger import MessengerService
 
 class ProductService:
+    """
+    Handles lifecycle and business logic for the Product entity.
+    Enforces strict UUID serialization for JSONB Audit Logging.
+    """
     
     @staticmethod
     def create(db: Session, product_in: ProductCreate, tenant_id: UUID, user_id: UUID) -> Optional[Product]:
         """
         Creates or restores a product. Validates SKU uniqueness within the tenant's isolated schema.
+        Architectural Note: mode='json' is enforced on model_dump to serialize UUIDs for JSONB storage.
         """
         existing = ProductService.get_by_sku(
             db=db, tenant_id=tenant_id, sku_pai=product_in.sku_pai, 
@@ -35,7 +40,9 @@ class ProductService:
             existing.deleted_at = None
             db.flush()
             
-            AuditService.log_action(db, tenant_id, user_id, "RESTORE", "Product", str(existing.id), product_in.model_dump())
+            AuditService.log_action(
+                db, tenant_id, user_id, "RESTORE", "Product", str(existing.id), product_in.model_dump(mode='json')
+            )
             db.commit()
             db.refresh(existing)
             return existing
@@ -44,7 +51,9 @@ class ProductService:
         db.add(db_product)
         db.flush() 
         
-        AuditService.log_action(db, tenant_id, user_id, "CREATE", "Product", str(db_product.id), product_in.model_dump())
+        AuditService.log_action(
+            db, tenant_id, user_id, "CREATE", "Product", str(db_product.id), product_in.model_dump(mode='json')
+        )
         db.commit()
         db.refresh(db_product)
         return db_product

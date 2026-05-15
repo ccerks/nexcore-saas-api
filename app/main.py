@@ -44,7 +44,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Router Registration
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(user.router, prefix="/api/v1/users", tags=["Users"])
-#app.include_router(tenant.router, prefix="/api/v1/tenants", tags=["Tenants"])
+app.include_router(tenant.router, prefix="/api/v1/tenants", tags=["Tenants"])
 app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["Dashboard"])
 app.include_router(product.router, prefix="/api/v1/products", tags=["Products"])
 app.include_router(payment.router, prefix="/api/v1/payments", tags=["Payments & Webhooks"])

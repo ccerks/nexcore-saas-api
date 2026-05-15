@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Request, HTTPException, Header, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 import stripe
 
 from app.core.config import settings
@@ -20,7 +21,8 @@ async def stripe_webhook(
 ):
     """
     Stripe Webhook endpoint.
-    Validates signature and processes asynchronous billing events to update Tenant status.
+    Validates signature and processes asynchronous billing events.
+    Enforces 'public' schema context for global tenant management.
     """
     if not stripe_signature:
         raise HTTPException(status_code=400, detail="Missing Stripe signature header")
@@ -39,6 +41,10 @@ async def stripe_webhook(
         raise HTTPException(status_code=400, detail="Invalid payload format")
 
     event_type = event.get('type')
+    
+    # Architectural Shield: Webhooks bypass the standard JWT dependency.
+    # We must explicitly force the connection to the global map to query Tenants.
+    db.execute(text('SET search_path TO "public"'))
     
     if event_type == 'customer.created':
         customer = event['data']['object']

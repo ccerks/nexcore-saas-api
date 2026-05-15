@@ -22,7 +22,8 @@ def get_dashboard_summary(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Retrieve aggregated metrics and recent activity for the tenant's dashboard.
+    Retrieves aggregated metrics and recent activity for the tenant's dashboard.
     Implements rate limiting to prevent heavy aggregate query abuse.
+    Architectural Note: Relies on the physical schema isolation enforced by get_current_user.
     """
-    return DashboardService.get_summary(db=db, tenant_id=current_user.tenant_id)
+    return DashboardService.get_summary(db=db)

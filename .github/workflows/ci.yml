@@ -7,7 +7,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build-and-inspect:
+  test-and-verify:
     runs-on: ubuntu-latest
 
     steps:
@@ -29,7 +29,21 @@ jobs:
         flake8 app --count --select=E9,F63,F7,F82 --show-source --statistics
         flake8 app --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
 
-    - name: Validate Infrastructure Build (Docker Compose)
+    - name: Build & Run Infrastructure
       run: |
         cp .env.example .env
         docker compose build
+        docker compose up -d # Sobe o banco, redis e rabbitmq
+
+    - name: Wait for Database
+      run: sleep 10 # Dá tempo para o PostgreSQL estar pronto para conexões
+
+    - name: Run Migrations (Alembic)
+      run: |
+        # Garante que a estrutura global (public) está íntegra
+        docker compose exec -T api alembic upgrade head
+
+    - name: Execute Automated Test Suite (Pytest)
+      run: |
+        # Roda os testes (incluindo o de criação de usuário que corrigimos)
+        docker compose exec -T api pytest

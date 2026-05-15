@@ -31,10 +31,12 @@ jobs:
 
     - name: Build and Run Infrastructure
       run: |
-        cp .env.example .env
+        # Decisão Arquitetural: Corrigimos o nome da chave para DATABASE_URL para dar match exato
+        # com o que está definido no ficheiro .env.example do projeto.
+        grep -v "^DATABASE_URL=" .env.example | grep -v "^SECRET_KEY=" > .env
         
-        # Architectural Fix: Dynamically inject test database credentials into the CI environment
-        echo "SQLALCHEMY_DATABASE_URL=postgresql://postgres:postgres@db:5432/nexcore_test" >> .env
+        # Injeta as credenciais de teste com o nome de variável correto
+        echo "DATABASE_URL=postgresql://postgres:postgres@db:5432/nexcore_test" >> .env
         echo "SECRET_KEY=super_secret_ci_testing_key_123" >> .env
         
         docker compose build
@@ -45,10 +47,8 @@ jobs:
 
     - name: Execute Migrations (Alembic)
       run: |
-        # Ensures the global public schema and dynamic routing are intact
         docker compose exec -T api alembic upgrade head
 
     - name: Execute Automated Test Suite (Pytest)
       run: |
-        # Runs isolated tests across endpoints and database layers
         docker compose exec -T api pytest

@@ -14,7 +14,7 @@ class AuditLogSummary(BaseModel):
     id: UUID
     action: str
     entity_name: str
-    created_at: datetime
+    created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 
 class DashboardMetricsResponse(BaseModel):

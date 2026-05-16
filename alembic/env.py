@@ -1,40 +1,28 @@
 import os
-from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool, text
+from sqlalchemy import text
 from alembic import context
-
 from app.db.session import Base
 from app.models.tenant import Tenant 
 from app.models.user import User
 from app.models.product import Product
 from app.models.audit import AuditLog
 
-config = context.config
 target_metadata = Base.metadata
-
-database_url = os.getenv("DATABASE_URL")
-if database_url:
-    config.set_main_option("sqlalchemy.url", database_url)
-
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
 
 def include_object(obj, name, type_, reflected, compare_to):
     """
-    Filters which objects are included in the migration based on the schema.
-    Prevents global tables (public) from being recreated in tenant schemas.
+    Multi-tenant migration filter. 
+    Prevents schema leakage by restricting table discovery based on current search path.
     """
-    global_tables = ["tenants", "users"]
-    tenant_tables = ["products", "audit_logs"]
+    if type_ == "table":
+        bind = context.get_bind()
+        schema = bind.execute(text("SELECT current_schema()")).scalar()
 
-    bind = context.get_bind()
-    current_schema = bind.execute(text("SELECT current_schema()")).scalar()
-
-    if current_schema == "public":
-        return name in global_tables
-    
-    if current_schema and current_schema.startswith("tenant_"):
-        return name in tenant_tables
+        if schema == "public":
+            return name in ["tenants", "users", "alembic_version"]
+        
+        if schema and schema.startswith("tenant_"):
+            return name in ["products", "audit_logs", "alembic_version"]
 
     return True
 

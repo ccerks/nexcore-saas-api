@@ -1,13 +1,18 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from typing import List
+import uuid
 
 from app.models.tenant import Tenant
 from app.models.product import Product
 from app.models.audit import AuditLog
 from app.schemas.tenant import TenantCreate
 from app.services.stripe_service import StripeService
-from app.db.session import engine
+from app.db.session import engine, Base
+
+# Internal service bindings for unified provisioning
+from app.services.user import UserService
+from app.schemas.user import UserCreate
+from app.services.audit import AuditService
 
 class TenantService:
     """
@@ -57,7 +62,8 @@ class TenantService:
     def create(db: Session, tenant_in: TenantCreate) -> Tenant:
         """
         Provisions a new tenant, orchestrating global record creation, 
-        Stripe customer attachment, and isolated schema generation.
+        Stripe billing generation, physical schema materialization,
+        default master user injection, and initial audit logs.
         """
         db.execute(text('SET search_path TO "public"'))
         db_tenant = Tenant(**tenant_in.model_dump())
@@ -76,22 +82,53 @@ class TenantService:
             db.commit()
             db.refresh(db_tenant)
             
-            # 2. Schema Provisioning
+            # 2. Physical Schema Provisioning
             schema_name = f"tenant_{db_tenant.slug}"
             db.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema_name}"'))
             db.commit()
             
-            # 3. Selective Migration (Architectural Fix)
-            with engine.connect() as conn:
-                conn.execute(text(f'SET search_path TO "{schema_name}", public'))
-                
-                tenant_specific_tables = [
-                    Product.__table__,
-                    AuditLog.__table__
-                ]
-                
-                Product.metadata.create_all(conn, tables=tenant_specific_tables)
+            # 3. Isolated DDL Materialization
+            tenant_specific_tables = [Product.__table__, AuditLog.__table__]
+            with engine.connect().execution_options(schema_translate_map={None: schema_name}) as conn:
+                Base.metadata.create_all(conn, tables=tenant_specific_tables)
                 conn.commit()
+                
+            # 4. Automated Master User Provisioning
+            master_email = f"master@{db_tenant.slug}.com"
+            master_password = "SecurePassword123!"
+            
+            admin_in = UserCreate(
+                tenant_id=db_tenant.id,
+                email=master_email,
+                password=master_password,
+                full_name=f"Master {db_tenant.name}",
+                role="admin"
+            )
+            UserService.create(db, user_in=admin_in)
+
+            # 5. Schema Alignment & Initial Audit Log Injection
+            db.execute(text(f'SET search_path TO "{schema_name}"'))
+            
+            AuditService.log_action(
+                db=db,
+                tenant_id=db_tenant.id,
+                user_id=None,
+                action="PROVISION_TENANT",
+                entity_name="Tenant",
+                entity_id=str(db_tenant.id),
+                changes={"name": db_tenant.name, "slug": db_tenant.slug}
+            )
+            
+            AuditService.log_action(
+                db=db,
+                tenant_id=db_tenant.id,
+                user_id=None,
+                action="PROVISION_MASTER_USER",
+                entity_name="User",
+                entity_id=master_email,
+                changes={"email": master_email, "role": "admin"}
+            )
+            db.commit()
                 
             return db_tenant
             

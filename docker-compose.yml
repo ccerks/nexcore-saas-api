@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   api:
     build: .
@@ -12,7 +10,7 @@ services:
       - db
       - redis
     volumes:
-      - .:/app # Maps the local root repository into the container workspace
+      - .:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   worker:
@@ -25,14 +23,14 @@ services:
     env_file:
       - .env
     volumes:
-      - ./uploads:/app/uploads # Persists uploaded binary assets inside the worker environment
+      - ./uploads:/app/uploads
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: nexcore_rabbitmq
     ports:
-      - "5672:5672"   # Message broker AMQP protocol port
-      - "15672:15672" # RabbitMQ Management Web UI dashboard
+      - "5672:5672"
+      - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
@@ -46,18 +44,17 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      # Architectural Security Boundary: Binds custom host port 5433 strictly to loopback interface.
-      # Maps host 127.0.0.1:5433 securely to the container's internal PostgreSQL port 5432.
+      # Architectural Security Boundary: Localhost binding for secure SSH tunneling
       - "127.0.0.1:5433:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data # Volume mount for database persistence
+      - postgres_data:/var/lib/postgresql/data
 
   redis:
     image: redis:7-alpine
     container_name: nexcore_redis
     restart: always
     ports:
-      - "6379:6379" # In-memory key-value cache and rate-limiting store
+      - "6379:6379"
 
 volumes:
-  postgres_data: # Declared named volume for durable database state preservation
+  postgres_data:

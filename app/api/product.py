@@ -139,7 +139,7 @@ async def upload_product_image(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    image_url = await StorageService.save_product_image(file, str(current_user.tenant_id))
+    image_url = await StorageService.save_product_image(file, str(current_user.tenant_id), product_id=str(product_id))
     
     updated_product = ProductService.update_image_url(
         db=db, 

@@ -73,6 +73,7 @@ def upgrade() -> None:
     sa.Column('stock', sa.Integer(), nullable=True),
     sa.Column('attributes', sa.JSON(), nullable=True),
     sa.Column('image_url', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('last_deleted_by', sa.UUID(), nullable=True),
     sa.Column('deactivation_count', sa.Integer(), nullable=True),

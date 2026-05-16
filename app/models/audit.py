@@ -25,7 +25,7 @@ class AuditLog(Base):
     entity_id = Column(String(50), nullable=False)
     
     changes = Column(JSON, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), default=func.now(), server_default=func.now())
 
     # Relationships point to global models already anchored in 'public'
     user = relationship("User")

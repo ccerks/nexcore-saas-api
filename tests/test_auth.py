@@ -32,6 +32,7 @@ def setup_verified_user(db):
     user = User(
         id=uuid.uuid4(),
         tenant_id=tenant.id,
+        username=fake.user_name(), # Architectural Fix: Injected mandatory identifier
         email=fake.email(),
         hashed_password=get_password_hash(raw_password),
         role="admin",

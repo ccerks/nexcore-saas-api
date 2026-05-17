@@ -50,17 +50,18 @@ erDiagram
     public_USERS {
         uuid id PK
         uuid tenant_id FK "Global Anchor"
+        string username "Unique Identity"
         string email
-        string role
+        string role "RBAC"
     }
 
     tenant_PRODUCTS {
         uuid id PK
+        bigint friendly_id "Auto-increment Sequence"
         uuid tenant_id FK "Cross-Schema Ref"
-        uuid parent_id FK "SKU Variations"
+        uuid parent_id FK "Variations"
         string name
-        string sku_pai
-        string image_url "Storage Path"
+        string sku "Unique Store Identifier"
         json attributes
         float price
         datetime deleted_at "Soft Delete"
@@ -79,11 +80,11 @@ erDiagram
 ## 🌟 Key Features
 - **Enterprise Multi-tenancy:** Physical data isolation via dynamically generated PostgreSQL schemas per tenant. Prevents data leakage at the database engine level.
 - **Cross-Schema Validation:** Employs raw SQL "Sniper Queries" to validate global states (e.g., Free Tier limits) directly from the `public` schema without losing the tenant's transaction context.
+- **Superadmin Impersonation:** Advanced contextual switching allowing global superadmins to operate within specific tenant boundaries securely.
 - **Payment Gateway & Billing:** Stripe SDK integration for customer provisioning using Atomic Database Transactions, paired with a secure Webhook listener.
 - **High-Performance Ingestion (Bulk Insert):** Atomic batch processing for catalogs, ensuring database integrity with automatic full-batch rollbacks on SKU conflicts.
-- **Event-Driven Architecture:** Asynchronous background task processing using RabbitMQ (e.g., orphaned image cleanup) to guarantee low-latency HTTP responses.
-- **Asynchronous Storage I/O:** Utilizes `aiofiles` for true async multipart file uploads, protecting the event loop during disk writes.
-- **Advanced Catalog:** Complex product management supporting hierarchical SKU variations (parent/child relationships) and JSON-based dynamic attributes.
+- **Event-Driven Architecture:** Asynchronous background task processing using RabbitMQ to guarantee low-latency HTTP responses.
+- **Advanced Catalog:** Complex product management supporting hierarchical SKU variations, JSON-based dynamic attributes, and auto-incrementing friendly IDs via PostgreSQL sequences.
 - **Audit & Traceability:** Immutable audit logging stored safely within the tenant's isolated dimension.
 - **Backend-For-Frontend (BFF):** Aggregated dashboard metrics endpoint designed to reduce client-side network round-trips and optimize initial load times.
 - **Performance & Observability:** Global rate limiting using the Sliding Window Counter algorithm via Redis. Centralized exception handler that dispatches real-time stack traces to Discord.
@@ -116,6 +117,10 @@ erDiagram
    ```bash
    docker-compose exec api python scripts/create_admin.py
    ```
+6. Provision the Global Superadmin:
+   ```bash
+   docker-compose exec api python scripts/create_superadmin.py
+   ```
 
 The API will be available at `http://localhost:8000`
 Check the interactive docs at `http://localhost:8000/docs`
@@ -127,19 +132,19 @@ docker compose exec api python -m pytest tests/
 ```
 
 ## 💳 Stripe Setup & Local Testing
-To handle real-time billing events (Webhooks) durante o desenvolvimento:
+To handle real-time billing events (Webhooks) during development:
 
-1. **Configure API Keys:** Add seu `STRIPE_SECRET_KEY` e `STRIPE_WEBHOOK_SECRET` ao `.env`.
-2. **Start the Webhook Tunnel:** Use a CLI do Stripe para encaminhar eventos:
+1. **Configure API Keys:** Add your `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` to `.env`.
+2. **Start the Webhook Tunnel:** Use the Stripe CLI to forward events:
    ```bash
    stripe listen --forward-to localhost:8000/api/v1/payments/webhook
    ```
 
 ## 📡 Observability & Monitoring
-O sistema possui um Global Exception Handler que monitora a saúde da API em tempo real.
+The system features a Global Exception Handler that monitors API health in real-time.
 
-- **Discord Integration:** Qualquer erro `500` dispara um alerta automatizado via Webhook.
-- **Payload Sanitization:** Enquanto o time de engenharia recebe o stack trace completo, o usuário final vê apenas uma mensagem segura.
+- **Discord Integration:** Any `500` error or system bootstrap triggers an automated webhook alert.
+- **Payload Sanitization:** While the engineering team receives the full stack trace, the end-user sees a safe, sanitized message.
 
 ## 🛠️ Project Structure
 ```text
@@ -162,11 +167,12 @@ scripts/           # Utility for initial system setup
         
 - [x] **Phase 2: Identity & Multi-Tenancy**
   - [x] Tenant and User models with Physical Isolation logic
-  - [x] JWT Authentication & RBAC
+  - [x] JWT Authentication & RBAC (Superadmin, Admin, User)
         
 - [x] **Phase 3: E-commerce & Payments Core**
-  - [x] Product models & Stripe integration
+  - [x] Product models, consolidated SKUs & Stripe integration
   - [x] Bulk Insert functionality (Horde Encounters)
+  - [ ] 1:N Product Images Architecture (In Progress)
         
 - [x] **Phase 4: Performance & Observability**
   - [x] Redis Rate Limiting & Global Exception Handling

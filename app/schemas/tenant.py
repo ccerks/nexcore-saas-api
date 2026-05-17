@@ -22,3 +22,8 @@ class TenantResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+class TenantProvisionResponse(TenantResponse):
+    master_email: str = Field(..., description="Generated email for the initial administrator.")
+    temporary_password: str = Field(..., description="Strong temporary password (15-minute TTL).")
+    expires_in: str = Field("15 minutes")

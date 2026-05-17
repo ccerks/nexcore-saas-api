@@ -20,6 +20,14 @@ def user_token_key(request: Request) -> str:
     fallback_ip = request.client.host if request.client else "127.0.0.1"
     return request.headers.get("Authorization", fallback_ip)
 
+def ensure_tenant_context(user: User):
+    """Architectural Shield: Prevents global Superadmins from executing tenant-bound queries without Impersonation."""
+    if not user.tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tenant context required. Superadmins must provide x-tenant-id header."
+        )
+
 @router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("60/minute", key_func=user_token_key)
 def create_product(
@@ -28,9 +36,9 @@ def create_product(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Creates a product. Enforces Free Tier limits using cross-schema raw SQL.
-    """
+    """Creates a product. Enforces Free Tier limits using cross-schema raw SQL."""
+    ensure_tenant_context(current_user)
+
     tenant_record = db.execute(
         text("SELECT stripe_subscription_id FROM public.tenants WHERE id = :tid"),
         {"tid": str(current_user.tenant_id)}
@@ -74,9 +82,9 @@ def bulk_create_products(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Processes batch insertion of products while enforcing tier limits.
-    """
+    """Processes batch insertion of products while enforcing tier limits."""
+    ensure_tenant_context(current_user)
+
     tenant_record = db.execute(
         text("SELECT stripe_subscription_id FROM public.tenants WHERE id = :tid"),
         {"tid": str(current_user.tenant_id)}
@@ -122,6 +130,7 @@ def list_products(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    ensure_tenant_context(current_user)
     return ProductService.get_paginated_products(
         db=db,
         tenant_id=current_user.tenant_id,
@@ -130,31 +139,10 @@ def list_products(
         name_filter=name
     )
 
-@router.post("/{product_id}/image", response_model=ProductResponse)
-@limiter.limit("30/minute", key_func=user_token_key)
-async def upload_product_image(
-    request: Request,
-    product_id: UUID,
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    image_url = await StorageService.save_product_image(file, str(current_user.tenant_id), product_id=str(product_id))
-    
-    updated_product = ProductService.update_image_url(
-        db=db, 
-        product_id=product_id, 
-        tenant_id=current_user.tenant_id, 
-        image_url=image_url
-    )
-    
-    if not updated_product:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Product not found or access denied."
-        )
-        
-    return updated_product
+# ARCHITECTURAL NOTE: Commented out pending Epic 3 (1:N ProductImage table implementation)
+# @router.post("/{product_id}/image", response_model=ProductResponse)
+# @limiter.limit("30/minute", key_func=user_token_key)
+# async def upload_product_image(...)
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 @limiter.limit("60/minute", key_func=user_token_key)
@@ -164,6 +152,7 @@ def delete_product(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    ensure_tenant_context(current_user)
     success = ProductService.delete(
         db=db,
         product_id=product_id,

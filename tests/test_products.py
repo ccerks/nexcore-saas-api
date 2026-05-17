@@ -29,6 +29,7 @@ def get_authenticated_headers(client, db):
     user = User(
         id=uuid.uuid4(),
         tenant_id=tenant.id,
+        username=fake.user_name(), # Architectural Fix
         email=fake.email(),
         hashed_password=get_password_hash(raw_password),
         role="admin",
@@ -46,10 +47,11 @@ def get_authenticated_headers(client, db):
     return {"Authorization": f"Bearer {token}"}, tenant.id
 
 def generate_dynamic_product_payload():
+    """Architectural Fix: Replaced legacy sku_pai with consolidated sku"""
     product_name = f"{fake.word().capitalize()} {fake.word().capitalize()}"
     return {
         "name": product_name,
-        "sku_pai": fake.unique.ean(length=8),
+        "sku": fake.unique.ean(length=8), 
         "price": round(random.uniform(10.0, 999.99), 2),
         "attributes": {
             "color": fake.color_name(), 

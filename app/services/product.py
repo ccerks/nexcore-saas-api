@@ -21,12 +21,10 @@ class ProductService:
     @staticmethod
     def create(db: Session, product_in: ProductCreate, tenant_id: UUID, user_id: UUID) -> Optional[Product]:
         """
-        Creates or restores a product. Validates SKU uniqueness within the tenant's isolated schema.
-        Architectural Note: mode='json' is enforced on model_dump to serialize UUIDs for JSONB storage.
+        Creates or restores a product. Validates unified SKU uniqueness.
         """
         existing = ProductService.get_by_sku(
-            db=db, tenant_id=tenant_id, sku_pai=product_in.sku_pai, 
-            sku_filho=product_in.sku_filho, include_deleted=True
+            db=db, tenant_id=tenant_id, sku=product_in.sku, include_deleted=True
         )
         
         if existing:
@@ -60,9 +58,7 @@ class ProductService:
 
     @classmethod
     def bulk_create(cls, db: Session, products_in: List[ProductCreate], tenant_id: UUID, user_id: UUID) -> Optional[List[Product]]:
-        """
-        Processes atomic batch insertion of products.
-        """
+        """Processes atomic batch insertion of products."""
         try:
             db_products = [Product(**p.model_dump(), tenant_id=tenant_id) for p in products_in]
             db.add_all(db_products)
@@ -79,27 +75,9 @@ class ProductService:
             db.rollback()
             return None
 
-    @staticmethod
-    def update_image_url(db: Session, product_id: UUID, tenant_id: UUID, image_url: str) -> Optional[Product]:
-        """
-        Updates image and dispatches background task to RabbitMQ for orphaned file cleanup.
-        """
-        product = db.query(Product).filter(
-            Product.id == product_id, Product.tenant_id == tenant_id, Product.deleted_at == None
-        ).first()
-        
-        if not product:
-            return None
-            
-        old_image_url = product.image_url
-        product.image_url = image_url
-        db.commit()
-        db.refresh(product)
-        
-        if old_image_url and old_image_url != image_url:
-            ProductService._dispatch_image_cleanup(old_image_url)
-
-        return product
+    # ARCHITECTURAL NOTE: update_image_url commented out pending Epic 3 (ProductImage entity)
+    # @staticmethod
+    # def update_image_url(...)
 
     @staticmethod
     def _dispatch_image_cleanup(file_path: str) -> None:
@@ -136,7 +114,7 @@ class ProductService:
 
         MessengerService.send_notification({
             "event": "PRODUCT_DELETED", "tenant_id": str(tenant_id),
-            "product_name": product.name, "sku": product.sku_pai, "deleted_by": str(user_id)
+            "product_name": product.name, "sku": product.sku, "deleted_by": str(user_id)
         })
         
         AuditService.log_action(db, tenant_id, user_id, "DELETE", "Product", str(product.id))
@@ -155,10 +133,9 @@ class ProductService:
         return {"items": items, "total": total, "page": page, "size": size, "pages": pages}
 
     @staticmethod
-    def get_by_sku(db: Session, tenant_id: UUID, sku_pai: str, sku_filho: str = None, include_deleted: bool = False) -> Optional[Product]:
-        query = db.query(Product).filter(Product.tenant_id == tenant_id, Product.sku_pai == sku_pai)
+    def get_by_sku(db: Session, tenant_id: UUID, sku: str, include_deleted: bool = False) -> Optional[Product]:
+        """Architectural Fix: Lookup by unified SKU identifier."""
+        query = db.query(Product).filter(Product.tenant_id == tenant_id, Product.sku == sku)
         if not include_deleted:
             query = query.filter(Product.deleted_at == None)
-        if sku_filho:
-            query = query.filter(Product.sku_filho == sku_filho)
         return query.first()

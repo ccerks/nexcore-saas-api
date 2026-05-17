@@ -8,12 +8,14 @@ class ProductSummary(BaseModel):
     name: str
     sku_pai: str
     price: float
+    created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
 class AuditLogSummary(BaseModel):
     id: UUID
     action: str
     entity_name: str
+    entity_id: str
     created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 

@@ -1,28 +1,46 @@
 import os
-from sqlalchemy import text
+from logging.config import fileConfig
+
+from sqlalchemy import engine_from_config, pool, text
 from alembic import context
+
 from app.db.session import Base
 from app.models.tenant import Tenant 
 from app.models.user import User
 from app.models.product import Product
 from app.models.audit import AuditLog
 
+# Initialize Alembic configuration object
+config = context.config
+
+# Inject environment database URL to feed the engine
+database_url = os.getenv("DATABASE_URL")
+if database_url:
+    config.set_main_option("sqlalchemy.url", database_url)
+
+# Configure standard logging
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+
 target_metadata = Base.metadata
 
 def include_object(obj, name, type_, reflected, compare_to):
     """
-    Multi-tenant migration filter. 
-    Prevents schema leakage by restricting table discovery based on current search path.
+    Multi-tenant migration filter.
+    Explicitly ignores the Alembic internal control table to prevent self-deletion.
     """
+    if name == "alembic_version":
+        return False
+
     if type_ == "table":
         bind = context.get_bind()
         schema = bind.execute(text("SELECT current_schema()")).scalar()
 
         if schema == "public":
-            return name in ["tenants", "users", "alembic_version"]
+            return name in ["tenants", "users"]
         
         if schema and schema.startswith("tenant_"):
-            return name in ["products", "audit_logs", "alembic_version"]
+            return name in ["products", "audit_logs"]
 
     return True
 
@@ -38,6 +56,7 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 def run_migrations_online() -> None:
+    # Build the connection engine using the injected configuration
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
@@ -73,7 +92,7 @@ def run_migrations_online() -> None:
             with context.begin_transaction():
                 context.run_migrations()
 
-        # Critical Architecture Fix: Force SQLAlchemy 2.0 to commit the implicit transaction.
+        # Critical Architecture Fix: Force SQLAlchemy 2.0 to commit the implicit transaction
         connection.commit()
 
 if context.is_offline_mode():

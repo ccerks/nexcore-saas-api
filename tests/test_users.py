@@ -13,11 +13,6 @@ from app.core.config import settings
 fake = Faker()
 
 def setup_admin_headers(client, db) -> dict:
-    """
-    Provisions a test Tenant, isolated Schema, and an Admin User.
-    Architectural Fix: Bypasses the /login endpoint to avoid SlowAPI rate limits 
-    during test execution by securely forging the JWT token using system keys.
-    """
     # 1. Provision Tenant
     tenant = Tenant(id=uuid.uuid4(), name=fake.company(), slug=fake.slug())
     db.add(tenant)
@@ -38,6 +33,7 @@ def setup_admin_headers(client, db) -> dict:
     admin_user = User(
         id=uuid.uuid4(),
         tenant_id=tenant.id,
+        username=fake.user_name(), # Architectural Fix
         email=admin_email,
         hashed_password=get_password_hash(raw_password),
         role="admin",
@@ -46,7 +42,7 @@ def setup_admin_headers(client, db) -> dict:
     db.add(admin_user)
     db.commit()
 
-    # 4. Direct JWT Generation (Bypasses HTTP Rate Limits)
+    # 4. Direct JWT Generation
     token = jwt.encode(
         {"sub": admin_email}, 
         settings.SECRET_KEY, 
@@ -55,32 +51,25 @@ def setup_admin_headers(client, db) -> dict:
     
     return {"Authorization": f"Bearer {token}"}
 
-
 def test_create_user_success(client, db):
-    """
-    Validates employee creation via the secure '/employee' route.
-    """
     headers = setup_admin_headers(client, db)
     
+    test_username = fake.user_name()
     test_email = fake.email()
     test_password = "SecurePassword123!"
     
     response = client.post(
         "/api/v1/users/employee",
-        json={"email": test_email, "password": test_password, "full_name": "Staff User"},
+        json={"username": test_username, "email": test_email, "password": test_password, "full_name": "Staff User"},
         headers=headers
     )
     
     assert response.status_code == status.HTTP_201_CREATED
-    assert response.json()["email"] == test_email
-
+    assert response.json()["username"] == test_username
 
 def test_create_user_rate_limit(client, db):
-    """
-    Verifies Redis-based rate limiting on sensitive user creation endpoints.
-    """
     headers = setup_admin_headers(client, db)
-    payload = {"email": fake.email(), "password": "Password123!"}
+    payload = {"username": fake.user_name(), "email": fake.email(), "password": "Password123!"}
     
     for _ in range(5):
         client.post("/api/v1/users/employee", json=payload, headers=headers)

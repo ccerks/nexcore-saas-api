@@ -7,6 +7,7 @@
 ![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white)
 ![RabbitMQ](https://img.shields.io/badge/RabbitMQ-FF6600?logo=rabbitmq&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
+![AWS S3](https://img.shields.io/badge/AWS_S3-569A31?logo=amazons3&logoColor=white)
 ![Stripe](https://img.shields.io/badge/Stripe-626CD9?logo=Stripe&logoColor=white)
 ![Pytest](https://img.shields.io/badge/Pytest-Certified-brightgreen.svg?logo=pytest)
 ![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub_Actions-2088FF?logo=githubactions&logoColor=white)
@@ -21,7 +22,7 @@ NexCore is a robust, production-ready Multi-Tenant SaaS backend. In version 2.0.
 - **Migrations:** [Alembic](https://alembic.sqlalchemy.org/) (Dynamic Schema Routing)
 - **Cache & Rate Limiting:** [Redis](https://redis.io/)
 - **Message Broker:** [RabbitMQ](https://www.rabbitmq.com/) (Event-Driven Background Tasks)
-- **Async I/O Storage:** `aiofiles` for non-blocking media handling
+- **Cloud Storage:** AWS S3 (Asynchronous object manipulation via Boto3)
 - **Containerization:** [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/)
 - **Validation:** [Pydantic V2](https://docs.pydantic.dev/)
 - **Security:** JWT Authentication & Cross-Schema SQL Sniper Queries
@@ -37,6 +38,7 @@ erDiagram
     public_TENANTS ||--o{ tenant_AUDIT_LOGS : "has records"
     public_USERS ||--o{ tenant_AUDIT_LOGS : "performs"
     tenant_PRODUCTS ||--o{ tenant_PRODUCTS : "parent/child"
+    tenant_PRODUCTS ||--o{ tenant_PRODUCT_IMAGES : "gallery"
 
     public_TENANTS {
         uuid id PK
@@ -66,6 +68,14 @@ erDiagram
         float price
         datetime deleted_at "Soft Delete"
     }
+    
+    tenant_PRODUCT_IMAGES {
+        uuid id PK
+        uuid product_id FK
+        string url "S3 Object Link"
+        string alt_text
+        boolean is_main
+    }
 
     tenant_AUDIT_LOGS {
         uuid id PK
@@ -80,13 +90,12 @@ erDiagram
 ## 🌟 Key Features
 - **Enterprise Multi-tenancy:** Physical data isolation via dynamically generated PostgreSQL schemas per tenant. Prevents data leakage at the database engine level.
 - **Cross-Schema Validation:** Employs raw SQL "Sniper Queries" to validate global states (e.g., Free Tier limits) directly from the `public` schema without losing the tenant's transaction context.
-- **Superadmin Impersonation:** Advanced contextual switching allowing global superadmins to operate within specific tenant boundaries securely.
+- **Asynchronous Cloud Storage:** AWS S3 integration decoupled via RabbitMQ workers. Bulk Multipart Form-Data uploads are processed instantly, while deletion routines run non-blocking in the background.
+- **Query Optimization:** Implemented SQLAlchemy Eager Loading (`selectinload`) to eliminate N+1 query bottlenecks on nested 1:N relationships.
 - **Payment Gateway & Billing:** Stripe SDK integration for customer provisioning using Atomic Database Transactions, paired with a secure Webhook listener.
 - **High-Performance Ingestion (Bulk Insert):** Atomic batch processing for catalogs, ensuring database integrity with automatic full-batch rollbacks on SKU conflicts.
-- **Event-Driven Architecture:** Asynchronous background task processing using RabbitMQ to guarantee low-latency HTTP responses.
-- **Advanced Catalog:** Complex product management supporting hierarchical SKU variations, JSON-based dynamic attributes, and auto-incrementing friendly IDs via PostgreSQL sequences.
+- **Idempotent Soft-Delete:** Robust `PATCH /restore` mechanism allowing safe and repeatable product recovery without side effects.
 - **Audit & Traceability:** Immutable audit logging stored safely within the tenant's isolated dimension.
-- **Backend-For-Frontend (BFF):** Aggregated dashboard metrics endpoint designed to reduce client-side network round-trips and optimize initial load times.
 - **Performance & Observability:** Global rate limiting using the Sliding Window Counter algorithm via Redis. Centralized exception handler that dispatches real-time stack traces to Discord.
 
 ## 🚀 Getting Started
@@ -94,6 +103,7 @@ erDiagram
 ### Prerequisites
 - Docker & Docker Compose installed.
 - Stripe account (Test Mode Keys).
+- AWS Account (S3 Bucket & IAM Keys).
 
 ### Installation
 1. Clone the repository:
@@ -172,7 +182,8 @@ scripts/           # Utility for initial system setup
 - [x] **Phase 3: E-commerce & Payments Core**
   - [x] Product models, consolidated SKUs & Stripe integration
   - [x] Bulk Insert functionality (Horde Encounters)
-  - [ ] 1:N Product Images Architecture (In Progress)
+  - [x] 1:N Product Images Architecture (Multipart & S3)
+  - [x] Idempotent Soft-Delete Restoration
         
 - [x] **Phase 4: Performance & Observability**
   - [x] Redis Rate Limiting & Global Exception Handling
@@ -185,7 +196,7 @@ scripts/           # Utility for initial system setup
   - [x] Backend for Frontend (BFF) Dashboard Analytics
 
 - [ ] **Phase 6: Cloud-Native Evolution (v2.1.0--Planned)**
-  - [ ] AWS S3 Asset Offloading (Strategy Pattern)
+  - [x] AWS S3 Asset Offloading (Strategy Pattern) *(Anticipated)*
   - [ ] Cloudflare Edge Caching & Security
   - [ ] Infrastructure as Code (AWS ECS Fargate)
 

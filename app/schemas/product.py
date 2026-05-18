@@ -1,15 +1,22 @@
 from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from uuid import UUID
 from datetime import datetime
+
+class ProductImageResponse(BaseModel):
+    """Architectural Fix: Dedicated DTO for the 1:N image relationship."""
+    id: UUID
+    url: str
+    alt_text: Optional[str] = None
+    is_main: bool
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 class ProductBase(BaseModel):
     name: str = Field(..., max_length=255)
     description: Optional[str] = None
-    
-    # Architectural Fix: Unified SKU identifier
     sku: str = Field(..., max_length=100, description="Unique Stock Keeping Unit within the tenant.")
-    
     ean: Optional[str] = Field(None, max_length=13)
     is_variation: bool = Field(default=False)
     price: float = Field(..., ge=0.0)
@@ -43,5 +50,8 @@ class ProductResponse(ProductBase):
     deleted_at: Optional[datetime] = None
     last_deleted_by: Optional[UUID] = None
     deactivation_count: int
+    
+    # Architectural Fix: Nested collection mapping for the newly uncoupled image architecture
+    images: List[ProductImageResponse] = Field(default_factory=list, description="Collection of associated product media.")
 
     model_config = ConfigDict(from_attributes=True)

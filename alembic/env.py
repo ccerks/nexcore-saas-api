@@ -9,6 +9,8 @@ from app.models.tenant import Tenant
 from app.models.user import User
 from app.models.product import Product
 from app.models.audit import AuditLog
+# Architectural Fix: explicitly import the new image model for metadata tracking
+from app.models.product_image import ProductImage
 
 # Initialize Alembic configuration object
 config = context.config
@@ -40,7 +42,8 @@ def include_object(obj, name, type_, reflected, compare_to):
             return name in ["tenants", "users"]
         
         if schema and schema.startswith("tenant_"):
-            return name in ["products", "audit_logs"]
+            # Architectural Fix: Added 'product_images' to the tenant schema whitelist
+            return name in ["products", "product_images", "audit_logs"]
 
     return True
 

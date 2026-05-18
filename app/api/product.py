@@ -139,10 +139,105 @@ def list_products(
         name_filter=name
     )
 
-# ARCHITECTURAL NOTE: Commented out pending Epic 3 (1:N ProductImage table implementation)
-# @router.post("/{product_id}/image", response_model=ProductResponse)
-# @limiter.limit("30/minute", key_func=user_token_key)
-# async def upload_product_image(...)
+@router.post("/{product_id}/images", response_model=ProductResponse)
+@limiter.limit("30/minute", key_func=user_token_key)
+async def upload_product_images(
+    request: Request,
+    product_id: UUID,
+    files: List[UploadFile] = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Handles bulk image uploads via Multipart Form-Data.
+    Streams files to the storage provider and records metadata within a single atomic transaction.
+    """
+    ensure_tenant_context(current_user)
+    
+    product = db.query(Product).filter(
+        Product.id == product_id, 
+        Product.tenant_id == current_user.tenant_id, 
+        Product.deleted_at == None
+    ).first()
+    
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found.")
+
+    for file in files:
+        # 1. Asynchronous I/O to Cloud/Local Storage
+        image_url = await StorageService.save_product_image(file, str(current_user.tenant_id), str(product_id))
+        # 2. Database metadata linkage
+        ProductService.add_image_record(db, product_id, current_user.tenant_id, image_url, file.filename)
+        
+    db.commit()
+    db.refresh(product)
+    
+    return product
+
+@router.patch("/{product_id}/images/{image_id}/main", response_model=ProductResponse)
+@limiter.limit("30/minute", key_func=user_token_key)
+def set_main_product_image(
+    request: Request,
+    product_id: UUID,
+    image_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Sets a specific image as the primary storefront thumbnail.
+    """
+    ensure_tenant_context(current_user)
+    
+    success = ProductService.set_main_image(
+        db=db,
+        product_id=product_id,
+        image_id=image_id,
+        tenant_id=current_user.tenant_id
+    )
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product or Image not found."
+        )
+        
+    # Retorna o produto com a lista de imagens atualizada para refletir a nova capa
+    product = db.query(Product).filter(
+        Product.id == product_id, 
+        Product.tenant_id == current_user.tenant_id
+    ).first()
+    
+    return product
+
+@router.delete("/{product_id}/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("60/minute", key_func=user_token_key)
+def delete_product_image(
+    request: Request,
+    product_id: UUID,
+    image_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Deletes a specific product image.
+    Triggers an asynchronous worker task for physical storage cleanup.
+    """
+    ensure_tenant_context(current_user)
+    
+    success = ProductService.delete_image_record(
+        db=db,
+        product_id=product_id,
+        image_id=image_id,
+        tenant_id=current_user.tenant_id
+    )
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image or Product not found."
+        )
+        
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 @limiter.limit("60/minute", key_func=user_token_key)
@@ -166,3 +261,31 @@ def delete_product(
             detail="Product not found or already deleted."
         )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+@router.patch("/{product_id}/restore", response_model=ProductResponse)
+@limiter.limit("30/minute", key_func=user_token_key)
+def restore_product(
+    request: Request,
+    product_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Restores a previously soft-deleted product. Idempotent operation.
+    """
+    ensure_tenant_context(current_user)
+
+    product = ProductService.restore(
+        db=db,
+        product_id=product_id,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id
+    )
+
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product not found or already active."
+        )
+
+    return product

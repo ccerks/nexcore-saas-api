@@ -34,3 +34,4 @@ class Product(Base):
 
     tenant = relationship("Tenant", back_populates="products")
     children = relationship("Product", backref="parent", remote_side=[id])
+    images = relationship("ProductImage", back_populates="product", cascade="all, delete-orphan")

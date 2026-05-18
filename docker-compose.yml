@@ -23,6 +23,7 @@ services:
     env_file:
       - .env
     volumes:
+      - .:/app
       - ./uploads:/app/uploads
 
   rabbitmq:

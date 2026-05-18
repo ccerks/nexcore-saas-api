@@ -9,6 +9,7 @@ import uuid
 from app.models.tenant import Tenant
 from app.models.product import Product
 from app.models.audit import AuditLog
+from app.models.product_image import ProductImage
 from app.schemas.tenant import TenantCreate
 from app.services.stripe_service import StripeService
 from app.db.session import engine, Base
@@ -97,7 +98,11 @@ class TenantService:
             db.commit()
             
             with engine.connect().execution_options(schema_translate_map={None: schema_name}) as conn:
-                Base.metadata.create_all(conn, tables=[Product.__table__, AuditLog.__table__])
+                # Architectural Fix: Explicitly included ProductImage in the dynamic table creation whitelist
+                Base.metadata.create_all(
+                    conn, 
+                    tables=[Product.__table__, ProductImage.__table__, AuditLog.__table__]
+                )
                 conn.commit()
                 
             # 3. Cryptographic Password Generation
@@ -111,14 +116,13 @@ class TenantService:
             # 4. Master User with 15-Minute TTL
             master_email = f"master@{db_tenant.slug}.com"
             
-            # CORREÇÃO ARQUITETURAL: Geração de username aleatório (KISS)
-            # Evita colisões e cumpre o requisito de username único e autogerado
+            # Architectural KISS Principle: Generate random hash suffix for unique username allocation
             random_suffix = uuid.uuid4().hex[:6]
             master_username = f"master_{random_suffix}"
             
             admin_in = UserCreate(
                 tenant_id=db_tenant.id,
-                username=master_username, # O campo preenchido com a hash aleatória
+                username=master_username,
                 email=master_email,
                 password=temp_pwd,
                 full_name=f"Master {db_tenant.name}",
@@ -141,7 +145,6 @@ class TenantService:
                 f"**Master Identity:** master@{db_tenant.slug}.com"
             )
 
-            # Architectural Fix: Explicitly mapped 'created_at' and other fields
             return {
                 "id": db_tenant.id,
                 "name": db_tenant.name,

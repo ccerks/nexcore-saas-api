@@ -6,16 +6,15 @@ from app.models.audit import AuditLog
 
 class DashboardService:
     """
-    Handles data aggregation for the BFF layer.
-    Architectural Note: Relies on PostgreSQL's physical schema isolation (search_path).
-    Explicit tenant_id filtering is omitted as the session is already confined to the tenant's dimension.
+    Handles data aggregation metrics for the BFF layer.
+    Architectural Note: Operates within isolated tenant context established by search_path session routing.
     """
     
     @staticmethod
     def get_summary(db: Session) -> dict:
         """
-        Aggregates key metrics for the tenant's executive dashboard.
-        Executes highly optimized COUNT queries within the isolated schema.
+        Aggregates operational metrics for the active enterprise store dashboard views.
+        Optimized to run swift relational checks without loading full memory graphs.
         """
         active_count = db.query(Product).filter(
             Product.deleted_at.is_(None)
@@ -25,8 +24,9 @@ class DashboardService:
             Product.deleted_at.is_not(None)
         ).count()
         
+        # Architectural Fix: Adapted to count records lacking elements in the uncoupled 1:N table relationship
         no_image_count = db.query(Product).filter(
-            Product.image_url.is_(None),
+            ~Product.images.any(),
             Product.deleted_at.is_(None)
         ).count()
         

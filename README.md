@@ -65,9 +65,18 @@ erDiagram
         uuid parent_id FK "Variations"
         string name
         string sku "Unique Store Identifier"
-        json attributes
+        boolean is_active "Business State"
         float price
-        datetime deleted_at "Soft Delete"
+        float promotional_price
+        bigint stock
+        bigint reserved_stock "Anti-Overselling Guard"
+        json attributes
+        datetime created_at
+        datetime updated_at
+        uuid last_updated_by FK
+        datetime deleted_at "Soft Delete (Infra State)"
+        uuid last_deleted_by FK
+        bigint deactivation_count
     }
     
     tenant_PRODUCT_IMAGES {
@@ -76,6 +85,7 @@ erDiagram
         string url "S3 Object Link"
         string alt_text
         boolean is_main
+        datetime created_at
     }
 
     tenant_AUDIT_LOGS {
@@ -97,9 +107,9 @@ erDiagram
 - **Payment Gateway & Billing:** Stripe SDK integration for customer provisioning using Atomic Database Transactions, paired with a secure Webhook listener.
 - **High-Performance Ingestion (Bulk Insert):** Atomic batch processing for catalogs, ensuring database integrity with automatic full-batch rollbacks on SKU conflicts.
 - **Event-Driven Architecture:** Asynchronous background task processing using RabbitMQ to guarantee low-latency HTTP responses.
-- **Advanced Catalog:** Complex product management supporting hierarchical SKU variations, JSON-based dynamic attributes, and auto-incrementing friendly IDs via PostgreSQL sequences.
+- **Advanced Catalog:** Complex product management supporting hierarchical SKU variations, JSON-based dynamic attributes, promotional pricing, reserved stock guards, and auto-incrementing friendly IDs via PostgreSQL sequences.
 - **Idempotent Soft-Delete:** Robust `PATCH /restore` mechanism allowing safe and repeatable product recovery without side effects.
-- **Audit & Traceability:** Immutable audit logging stored safely within the tenant's isolated dimension.
+- **Audit & Traceability:** Immutable audit logging stored safely within the tenant's isolated dimension, with explicit orthogonal actor tracking (`last_updated_by`).
 - **Backend-For-Frontend (BFF):** Aggregated dashboard metrics endpoint designed to reduce client-side network round-trips and optimize initial load times.
 - **Performance & Observability:** Global rate limiting using the Sliding Window Counter algorithm via Redis. Centralized exception handler that dispatches real-time stack traces to Discord.
 

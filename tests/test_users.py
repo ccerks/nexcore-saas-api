@@ -72,3 +72,37 @@ def test_create_user_rate_limit(client, db):
         
     response = client.post("/api/v1/users/employee", json=payload, headers=headers)
     assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+
+def test_admin_cannot_create_superadmin_privilege_escalation(client, db):
+    """
+    Validates RBAC architectural shielding.
+    Ensures a standard tenant admin cannot escalate privileges by attempting
+    to provision a global superadmin account. Expects HTTP 403 Forbidden.
+    """
+    headers = setup_admin_headers(client, db)
+    
+    malicious_payload = {
+        "username": fake.user_name(), 
+        "email": fake.email(), 
+        "password": TEST_ADMIN_PASSWORD, 
+        "full_name": "Hacker User",
+        "role": "superadmin" # Privilege Escalation Attempt
+    }
+    
+    response = client.post("/api/v1/users/employee", json=malicious_payload, headers=headers)
+    
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert "detail" in response.json()
+
+def test_admin_cannot_list_global_tenants(client, db):
+    """
+    Validates Global Tenant Isolation.
+    Ensures that standard tenant admins cannot access the Superadmin dashboard endpoints.
+    Expects HTTP 403 Forbidden.
+    """
+    headers = setup_admin_headers(client, db)
+    
+    response = client.get("/api/v1/tenants/", headers=headers)
+    
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.json()["detail"] == "Superadmin privileges required."

@@ -1,4 +1,5 @@
 import pytest
+import redis
 from typing import Generator
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -17,6 +18,19 @@ SQLALCHEMY_DATABASE_URL = f"{base_url}/nexcore_test"
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+@pytest.fixture(autouse=True)
+def reset_rate_limits():
+    """
+    Architectural Fix: Prevents Test Pollution (Rate Limiter Exhaustion).
+    Flushes the Redis cache before each test to guarantee deterministic HTTP responses.
+    """
+    try:
+        r = redis.from_url(settings.REDIS_URL)
+        r.flushdb()
+    except Exception:
+        pass
+    yield
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_db():

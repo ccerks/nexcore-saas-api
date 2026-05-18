@@ -27,6 +27,14 @@ def ensure_tenant_context(user: User):
             detail="Tenant context required. Superadmins must provide x-tenant-id header."
         )
 
+def ensure_admin_privileges(user: User):
+    """Architectural Shield: Enforces strict RBAC constraints for orthogonal mutations."""
+    if user.role not in ["admin", "superadmin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient privileges. Admin access required."
+        )
+
 @router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("60/minute", key_func=user_token_key)
 def create_product(
@@ -37,6 +45,7 @@ def create_product(
 ):
     """Creates a product. Enforces Free Tier limits using cross-schema raw SQL."""
     ensure_tenant_context(current_user)
+    ensure_admin_privileges(current_user)
 
     tenant_record = db.execute(
         text("SELECT stripe_subscription_id FROM public.tenants WHERE id = :tid"),
@@ -83,6 +92,7 @@ def bulk_create_products(
 ):
     """Processes batch insertion of products while enforcing tier limits."""
     ensure_tenant_context(current_user)
+    ensure_admin_privileges(current_user)
 
     tenant_record = db.execute(
         text("SELECT stripe_subscription_id FROM public.tenants WHERE id = :tid"),
@@ -133,6 +143,7 @@ def update_product(
     Enforces tenant context isolation and automatically tracks the actor.
     """
     ensure_tenant_context(current_user)
+    ensure_admin_privileges(current_user)
     
     update_data = product_in.model_dump(exclude_unset=True)
     
@@ -170,6 +181,7 @@ def list_products(
 ):
     """Retrieves paginated catalog items dynamically filtered by tenant."""
     ensure_tenant_context(current_user)
+    # Architectural Bypass: Standard 'user' roles are permitted to perform GET operations
     return ProductService.get_paginated_products(
         db=db,
         tenant_id=current_user.tenant_id,
@@ -192,6 +204,7 @@ async def upload_product_images(
     Streams files to the storage provider and records metadata within a single atomic transaction.
     """
     ensure_tenant_context(current_user)
+    ensure_admin_privileges(current_user)
     
     product = db.query(Product).filter(
         Product.id == product_id, 
@@ -222,6 +235,7 @@ def set_main_product_image(
 ):
     """Sets a specific image as the primary storefront thumbnail."""
     ensure_tenant_context(current_user)
+    ensure_admin_privileges(current_user)
     
     success = ProductService.set_main_image(
         db=db,
@@ -254,6 +268,7 @@ def delete_product_image(
 ):
     """Deletes a specific product image. Triggers asynchronous storage cleanup."""
     ensure_tenant_context(current_user)
+    ensure_admin_privileges(current_user)
     
     success = ProductService.delete_image_record(
         db=db,
@@ -280,6 +295,8 @@ def delete_product(
 ):
     """Soft deletes a product."""
     ensure_tenant_context(current_user)
+    ensure_admin_privileges(current_user)
+    
     success = ProductService.delete(
         db=db,
         product_id=product_id,
@@ -301,6 +318,7 @@ def restore_product(
 ):
     """Restores a previously soft-deleted product."""
     ensure_tenant_context(current_user)
+    ensure_admin_privileges(current_user)
 
     product = ProductService.restore(
         db=db,

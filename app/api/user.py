@@ -16,6 +16,14 @@ from app.services.audit import AuditService
 
 router = APIRouter()
 
+def ensure_admin_privileges(user: User):
+    """Architectural Shield: Enforces strict RBAC constraints for user mutations."""
+    if user.role not in ["admin", "superadmin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient privileges. Admin access required."
+        )
+
 @router.post("/employee", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
 def create_employee(
@@ -28,35 +36,42 @@ def create_employee(
     Creates a new user strictly bound to the authenticated admin's tenant.
     Prevents cross-tenant injection and handles global Superadmin bootstrapping.
     """
+    ensure_admin_privileges(current_user)
+    
     db.execute(text('SET search_path TO "public"'))
     
-    # Architectural Shield 1: Privilege Escalation Prevention
     if user_in.role == "superadmin" and current_user.role != "superadmin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Only existing Superadmins can bootstrap new Superadmins."
+            detail="Only existing Superadmins can provision new global authorities."
         )
 
-    # Architectural Shield 2: Tenant Isolation & Global Entity Handling
-    if user_in.role == "superadmin":
-        # Superadmins must transcend isolated dimensions
-        user_in.tenant_id = None
-    else:
-        # Standard employees must be anchored to a specific dimension
-        if not current_user.tenant_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, 
-                detail="Superadmins must provide x-tenant-id header to create tenant employees."
-            )
-        user_in.tenant_id = current_user.tenant_id
+    existing_user = UserService.get_by_email(db, email=user_in.email)
+    if existing_user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered.")
         
-    if UserService.get_by_email(db, email=user_in.email):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="Email already registered in the system."
-        )
+    existing_username = UserService.get_by_username(db, username=user_in.username)
+    if existing_username:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken.")
+
+    target_tenant_id = user_in.tenant_id if current_user.role == "superadmin" else current_user.tenant_id
+    if not target_tenant_id and user_in.role != "superadmin":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Standard users must be bound to a tenant.")
+
+    user_in.tenant_id = target_tenant_id
+    new_user = UserService.create(db, user_in=user_in)
     
-    return UserService.create(db, user_in=user_in)
+    if new_user.tenant:
+        schema_name = f"tenant_{new_user.tenant.slug}"
+        db.execute(text(f'SET search_path TO "{schema_name}"'))
+        AuditService.log_action(
+            db=db, tenant_id=new_user.tenant_id, user_id=current_user.id, 
+            action="CREATE_USER", entity_name="User", entity_id=new_user.email,
+            changes={"role": new_user.role}
+        )
+        db.commit()
+
+    return new_user
 
 @router.get("/me", response_model=UserResponse)
 def read_user_me(current_user: User = Depends(get_current_user)):

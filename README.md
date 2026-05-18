@@ -8,6 +8,7 @@
 ![RabbitMQ](https://img.shields.io/badge/RabbitMQ-FF6600?logo=rabbitmq&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
 ![AWS S3](https://img.shields.io/badge/AWS_S3-569A31?logo=amazons3&logoColor=white)
+![AWS ECS](https://img.shields.io/badge/AWS_Fargate-FF9900?logo=amazonaws&logoColor=white)
 ![Stripe](https://img.shields.io/badge/Stripe-626CD9?logo=Stripe&logoColor=white)
 ![Pytest](https://img.shields.io/badge/Pytest-Certified-brightgreen.svg?logo=pytest)
 ![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub_Actions-2088FF?logo=githubactions&logoColor=white)
@@ -18,12 +19,12 @@ NexCore is a robust, production-ready Multi-Tenant SaaS backend. In version 2.0.
 - **Framework:** [FastAPI](https://fastapi.tiangolo.com/) (Async, Type Safety, OpenAPI)
 - **Database:** [PostgreSQL](https://www.postgresql.org/) with [SQLAlchemy 2.0](https://www.sqlalchemy.org/)
 - **Multi-Tenancy:** Dedicated PostgreSQL Schemas (Physical Isolation)
-- **Testing:** [Pytest](https://docs.pytest.org/) & [Faker](https://faker.readthedocs.io/) (TDD Approach)
+- **Testing:** [Pytest](https://docs.pytest.org/) & [Faker](https://faker.readthedocs.io/) (TDD Approach with Dynamic Schema Routing)
 - **Migrations:** [Alembic](https://alembic.sqlalchemy.org/) (Dynamic Schema Routing)
 - **Cache & Rate Limiting:** [Redis](https://redis.io/)
 - **Message Broker:** [RabbitMQ](https://www.rabbitmq.com/) (Event-Driven Background Tasks)
 - **Async I/O Storage:** `aiofiles` for non-blocking local media handling
-- **Cloud Storage:** AWS S3 (Asynchronous object manipulation via Boto3)
+- **Cloud Infrastructure & Storage:** AWS S3 (Asynchronous object manipulation via Boto3) & AWS ECS Fargate
 - **Containerization:** [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/)
 - **Validation:** [Pydantic V2](https://docs.pydantic.dev/)
 - **Security:** JWT Authentication & Cross-Schema SQL Sniper Queries
@@ -94,22 +95,24 @@ erDiagram
         uuid user_id FK "Actor Ref"
         string action "CREATE/UPDATE/DELETE"
         string entity_name
+        string entity_id
         json changes "Snapshot"
+        datetime created_at
     }
 ```
 
 ## 🌟 Key Features
-- **Enterprise Multi-tenancy:** Physical data isolation via dynamically generated PostgreSQL schemas per tenant. Prevents data leakage at the database engine level.
+- **Enterprise Multi-tenancy:** Physical data isolation via dynamically generated PostgreSQL schemas per tenant. Prevents data leakage at the database engine level via a strict `get_tenant_db` dependency router.
 - **Cross-Schema Validation:** Employs raw SQL "Sniper Queries" to validate global states (e.g., Free Tier limits) directly from the `public` schema without losing the tenant's transaction context.
-- **Superadmin Impersonation:** Advanced contextual switching allowing global superadmins to operate within specific tenant boundaries securely.
-- **Asynchronous Cloud Storage:** AWS S3 integration decoupled via RabbitMQ workers. Bulk Multipart Form-Data uploads are processed instantly, while deletion routines run non-blocking in the background.
+- **Superadmin Impersonation:** Advanced contextual switching (Ephemeral DNA Injection) allowing global superadmins to operate within specific tenant boundaries securely.
+- **Continuous Deployment (CI/CD):** Fully automated GitHub Actions workflow targeting Amazon Elastic Container Registry (ECR) and AWS ECS Fargate for zero-downtime rolling updates.
+- **Asynchronous Cloud Storage:** AWS S3 integration decoupled via RabbitMQ workers. Bulk Multipart Form-Data uploads are processed instantly using a flexible Storage Strategy, while deletion routines run non-blocking in the background.
 - **Query Optimization:** Implemented SQLAlchemy Eager Loading (`selectinload`) to eliminate N+1 query bottlenecks on nested 1:N relationships.
 - **Payment Gateway & Billing:** Stripe SDK integration for customer provisioning using Atomic Database Transactions, paired with a secure Webhook listener.
 - **High-Performance Ingestion (Bulk Insert):** Atomic batch processing for catalogs, ensuring database integrity with automatic full-batch rollbacks on SKU conflicts.
-- **Event-Driven Architecture:** Asynchronous background task processing using RabbitMQ to guarantee low-latency HTTP responses.
+- **Event-Driven Architecture & BI:** Asynchronous background task processing using RabbitMQ. New tenant provisions and critical catalog deletions automatically trigger real-time Discord Business Intelligence (BI) webhooks.
 - **Advanced Catalog:** Complex product management supporting hierarchical SKU variations, JSON-based dynamic attributes, promotional pricing, reserved stock guards, and auto-incrementing friendly IDs via PostgreSQL sequences.
-- **Idempotent Soft-Delete:** Robust `PATCH /restore` mechanism allowing safe and repeatable product recovery without side effects.
-- **Audit & Traceability:** Immutable audit logging stored safely within the tenant's isolated dimension, with explicit orthogonal actor tracking (`last_updated_by`).
+- **Idempotent Soft-Delete & Traceability:** Robust `PATCH /restore` mechanism paired with immutable audit logging stored safely within the tenant's isolated dimension.
 - **Backend-For-Frontend (BFF):** Aggregated dashboard metrics endpoint designed to reduce client-side network round-trips and optimize initial load times.
 - **Performance & Observability:** Global rate limiting using the Sliding Window Counter algorithm via Redis. Centralized exception handler that dispatches real-time stack traces to Discord.
 
@@ -118,7 +121,7 @@ erDiagram
 ### Prerequisites
 - Docker & Docker Compose installed.
 - Stripe account (Test Mode Keys).
-- AWS Account (S3 Bucket & IAM Keys).
+- AWS Account (ECS Cluster, ECR Repository, S3 Bucket & IAM Keys).
 
 ### Installation
 1. Clone the repository:
@@ -151,7 +154,7 @@ The API will be available at `http://localhost:8000`
 Check the interactive docs at `http://localhost:8000/docs`
 
 ### 🧪 Running Tests
-The project includes a dedicated Test Environment with an isolated database.
+The project includes a dedicated Test Environment with deterministic database isolation logic to simulate production cross-schema operations.
 ```bash
 docker compose exec api python -m pytest tests/
 ```
@@ -182,6 +185,8 @@ The system features a Global Exception Handler that monitors API health in real-
   ├── services/    # Business logic (Service layer)
 tests/             # Automated test suite (Pytest + Faker)
 scripts/           # Utility for initial system setup
+infrastructure/    # AWS ECS Fargate JSON Task Definitions
+.github/workflows/ # CI/CD Deployment pipelines
 ```
 
 ## 🗺️ Development Roadmap
@@ -209,10 +214,14 @@ scripts/           # Utility for initial system setup
   - [x] Alembic dynamic routing logic for multi-tenancy
   - [x] Asynchronous messaging via RabbitMQ
   - [x] Backend for Frontend (BFF) Dashboard Analytics
+  - [x] Identity Lifecycle Management (RBAC & Password Rotation)
+  - [x] Event-Driven Discord Business Intelligence (BI) Alerts
 
 - [ ] **Phase 6: Cloud-Native Evolution (v2.1.0--Planned)**
   - [x] AWS S3 Asset Offloading (Strategy Pattern) *(Anticipated)*
+  - [x] Continuous Deployment (CD) pipeline via GitHub Actions
+  - [x] AWS Elastic Container Registry (ECR) pipeline integration
+  - [ ] Infrastructure scaling (AWS ECS Fargate)
   - [ ] Cloudflare Edge Caching & Security
-  - [ ] Infrastructure as Code (AWS ECS Fargate)
 
 **Developed by** [Caio Cerqueira](https://github.com/ccerks) 🚀

@@ -7,6 +7,8 @@ from app.models.tenant import Tenant
 from app.models.user import User
 from app.core.security import get_password_hash
 from app.db.session import engine, Base
+# Architectural Fix: DRY compliance via centralized test credentials
+from tests.conftest import TEST_ADMIN_PASSWORD
 
 fake = Faker()
 
@@ -28,13 +30,12 @@ def setup_verified_user(db):
     Base.metadata.create_all(bind=conn)
     conn.execute(text('SET search_path TO "public"'))
 
-    raw_password = "SecurePassword123!"
     user = User(
         id=uuid.uuid4(),
         tenant_id=tenant.id,
-        username=fake.user_name(), # Architectural Fix: Injected mandatory identifier
+        username=fake.user_name(), 
         email=fake.email(),
-        hashed_password=get_password_hash(raw_password),
+        hashed_password=get_password_hash(TEST_ADMIN_PASSWORD),
         role="admin",
         is_active=True
     )
@@ -42,7 +43,7 @@ def setup_verified_user(db):
     db.commit()
     db.refresh(user)
 
-    return {"email": user.email, "password": raw_password, "tenant_id": tenant.id}
+    return {"email": user.email, "password": TEST_ADMIN_PASSWORD, "tenant_id": tenant.id}
 
 def test_login_success_returns_jwt(client, db):
     credentials = setup_verified_user(db)
@@ -53,11 +54,12 @@ def test_login_success_returns_jwt(client, db):
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
     assert "access_token" in data
+    assert data["token_type"] == "bearer"
 
 def test_login_failure_wrong_password(client, db):
     credentials = setup_verified_user(db)
     response = client.post(
         "/api/v1/auth/login",
-        data={"username": credentials["email"], "password": "WrongPassword456!"}
+        data={"username": credentials["email"], "password": "WrongPassword123!"}
     )
     assert response.status_code == status.HTTP_401_UNAUTHORIZED

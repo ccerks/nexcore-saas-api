@@ -10,6 +10,8 @@ from app.db.session import get_db
 from app.models import Base
 from app.core.config import settings
 
+TEST_ADMIN_PASSWORD = "SecurePassword123!"
+
 base_url = settings.DATABASE_URL.rsplit("/", 1)[0]
 SQLALCHEMY_DATABASE_URL = f"{base_url}/nexcore_test"
 
@@ -49,3 +51,8 @@ def client(db) -> Generator:
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+@pytest.fixture
+def default_password() -> str:
+    """Fixture providing a deterministic strong password fulfilling Pydantic requirements."""
+    return TEST_ADMIN_PASSWORD

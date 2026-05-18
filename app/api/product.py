@@ -4,8 +4,7 @@ from sqlalchemy import text
 from uuid import UUID
 from typing import List
 
-from app.db.session import get_db
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_tenant_db
 from app.models.user import User
 from app.models.product import Product
 from app.schemas.product import ProductCreate, ProductResponse, ProductUpdate
@@ -33,7 +32,7 @@ def ensure_tenant_context(user: User):
 def create_product(
     request: Request,
     product_in: ProductCreate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_tenant_db),
     current_user: User = Depends(get_current_user)
 ):
     """Creates a product. Enforces Free Tier limits using cross-schema raw SQL."""
@@ -79,7 +78,7 @@ def create_product(
 def bulk_create_products(
     request: Request,
     products_in: List[ProductCreate],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_tenant_db),
     current_user: User = Depends(get_current_user)
 ):
     """Processes batch insertion of products while enforcing tier limits."""
@@ -126,7 +125,7 @@ def update_product(
     request: Request,
     product_id: UUID,
     product_in: ProductUpdate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_tenant_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -166,9 +165,10 @@ def list_products(
     page: int = Query(1, ge=1, description="Page number"),
     size: int = Query(20, ge=1, le=100, description="Items per page"),
     name: str | None = Query(None, description="Filter by product name"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_tenant_db),
     current_user: User = Depends(get_current_user)
 ):
+    """Retrieves paginated catalog items dynamically filtered by tenant."""
     ensure_tenant_context(current_user)
     return ProductService.get_paginated_products(
         db=db,
@@ -184,7 +184,7 @@ async def upload_product_images(
     request: Request,
     product_id: UUID,
     files: List[UploadFile] = File(...),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_tenant_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -203,9 +203,7 @@ async def upload_product_images(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found.")
 
     for file in files:
-        # 1. Asynchronous I/O to Cloud/Local Storage
         image_url = await StorageService.save_product_image(file, str(current_user.tenant_id), str(product_id))
-        # 2. Database metadata linkage
         ProductService.add_image_record(db, product_id, current_user.tenant_id, image_url, file.filename)
         
     db.commit()
@@ -219,12 +217,10 @@ def set_main_product_image(
     request: Request,
     product_id: UUID,
     image_id: UUID,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_tenant_db),
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Sets a specific image as the primary storefront thumbnail.
-    """
+    """Sets a specific image as the primary storefront thumbnail."""
     ensure_tenant_context(current_user)
     
     success = ProductService.set_main_image(
@@ -240,7 +236,6 @@ def set_main_product_image(
             detail="Product or Image not found."
         )
         
-    # Retorna o produto com a lista de imagens atualizada para refletir a nova capa
     product = db.query(Product).filter(
         Product.id == product_id, 
         Product.tenant_id == current_user.tenant_id
@@ -254,13 +249,10 @@ def delete_product_image(
     request: Request,
     product_id: UUID,
     image_id: UUID,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_tenant_db),
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Deletes a specific product image.
-    Triggers an asynchronous worker task for physical storage cleanup.
-    """
+    """Deletes a specific product image. Triggers asynchronous storage cleanup."""
     ensure_tenant_context(current_user)
     
     success = ProductService.delete_image_record(
@@ -283,9 +275,10 @@ def delete_product_image(
 def delete_product(
     request: Request,
     product_id: UUID,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_tenant_db),
     current_user: User = Depends(get_current_user)
 ):
+    """Soft deletes a product."""
     ensure_tenant_context(current_user)
     success = ProductService.delete(
         db=db,
@@ -295,10 +288,7 @@ def delete_product(
     )
     
     if not success:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Product not found or already deleted."
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found or already deleted.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @router.patch("/{product_id}/restore", response_model=ProductResponse)
@@ -306,12 +296,10 @@ def delete_product(
 def restore_product(
     request: Request,
     product_id: UUID,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_tenant_db),
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Restores a previously soft-deleted product. Idempotent operation.
-    """
+    """Restores a previously soft-deleted product."""
     ensure_tenant_context(current_user)
 
     product = ProductService.restore(
@@ -322,9 +310,6 @@ def restore_product(
     )
 
     if not product:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Product not found or already active."
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found or already active.")
 
     return product

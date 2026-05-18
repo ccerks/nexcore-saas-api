@@ -9,17 +9,17 @@ from app.models.user import User
 from app.core.security import get_password_hash
 from app.db.session import Base
 from app.core.config import settings
+# Architectural Fix: DRY compliance via centralized test credentials
+from tests.conftest import TEST_ADMIN_PASSWORD
 
 fake = Faker()
 
 def setup_admin_headers(client, db) -> dict:
-    # 1. Provision Tenant
     tenant = Tenant(id=uuid.uuid4(), name=fake.company(), slug=fake.slug())
     db.add(tenant)
     db.commit()
     db.refresh(tenant)
 
-    # 2. Provision Isolated Schema
     schema_name = f"tenant_{tenant.slug}"
     db.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema_name}"'))
     conn = db.connection()
@@ -27,22 +27,19 @@ def setup_admin_headers(client, db) -> dict:
     Base.metadata.create_all(bind=conn)
     conn.execute(text('SET search_path TO "public"'))
 
-    # 3. Provision Global Admin
-    raw_password = "SecurePassword123!"
     admin_email = fake.email()
     admin_user = User(
         id=uuid.uuid4(),
         tenant_id=tenant.id,
-        username=fake.user_name(), # Architectural Fix
+        username=fake.user_name(), 
         email=admin_email,
-        hashed_password=get_password_hash(raw_password),
+        hashed_password=get_password_hash(TEST_ADMIN_PASSWORD),
         role="admin",
         is_active=True
     )
     db.add(admin_user)
     db.commit()
 
-    # 4. Direct JWT Generation
     token = jwt.encode(
         {"sub": admin_email}, 
         settings.SECRET_KEY, 
@@ -56,11 +53,10 @@ def test_create_user_success(client, db):
     
     test_username = fake.user_name()
     test_email = fake.email()
-    test_password = "SecurePassword123!"
     
     response = client.post(
         "/api/v1/users/employee",
-        json={"username": test_username, "email": test_email, "password": test_password, "full_name": "Staff User"},
+        json={"username": test_username, "email": test_email, "password": TEST_ADMIN_PASSWORD, "full_name": "Staff User"},
         headers=headers
     )
     
@@ -69,7 +65,7 @@ def test_create_user_success(client, db):
 
 def test_create_user_rate_limit(client, db):
     headers = setup_admin_headers(client, db)
-    payload = {"username": fake.user_name(), "email": fake.email(), "password": "Password123!"}
+    payload = {"username": fake.user_name(), "email": fake.email(), "password": TEST_ADMIN_PASSWORD}
     
     for _ in range(5):
         client.post("/api/v1/users/employee", json=payload, headers=headers)

@@ -22,6 +22,7 @@ NexCore is a robust, production-ready Multi-Tenant SaaS backend. In version 2.0.
 - **Migrations:** [Alembic](https://alembic.sqlalchemy.org/) (Dynamic Schema Routing)
 - **Cache & Rate Limiting:** [Redis](https://redis.io/)
 - **Message Broker:** [RabbitMQ](https://www.rabbitmq.com/) (Event-Driven Background Tasks)
+- **Async I/O Storage:** `aiofiles` for non-blocking local media handling
 - **Cloud Storage:** AWS S3 (Asynchronous object manipulation via Boto3)
 - **Containerization:** [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/)
 - **Validation:** [Pydantic V2](https://docs.pydantic.dev/)
@@ -90,12 +91,16 @@ erDiagram
 ## 🌟 Key Features
 - **Enterprise Multi-tenancy:** Physical data isolation via dynamically generated PostgreSQL schemas per tenant. Prevents data leakage at the database engine level.
 - **Cross-Schema Validation:** Employs raw SQL "Sniper Queries" to validate global states (e.g., Free Tier limits) directly from the `public` schema without losing the tenant's transaction context.
+- **Superadmin Impersonation:** Advanced contextual switching allowing global superadmins to operate within specific tenant boundaries securely.
 - **Asynchronous Cloud Storage:** AWS S3 integration decoupled via RabbitMQ workers. Bulk Multipart Form-Data uploads are processed instantly, while deletion routines run non-blocking in the background.
 - **Query Optimization:** Implemented SQLAlchemy Eager Loading (`selectinload`) to eliminate N+1 query bottlenecks on nested 1:N relationships.
 - **Payment Gateway & Billing:** Stripe SDK integration for customer provisioning using Atomic Database Transactions, paired with a secure Webhook listener.
 - **High-Performance Ingestion (Bulk Insert):** Atomic batch processing for catalogs, ensuring database integrity with automatic full-batch rollbacks on SKU conflicts.
+- **Event-Driven Architecture:** Asynchronous background task processing using RabbitMQ to guarantee low-latency HTTP responses.
+- **Advanced Catalog:** Complex product management supporting hierarchical SKU variations, JSON-based dynamic attributes, and auto-incrementing friendly IDs via PostgreSQL sequences.
 - **Idempotent Soft-Delete:** Robust `PATCH /restore` mechanism allowing safe and repeatable product recovery without side effects.
 - **Audit & Traceability:** Immutable audit logging stored safely within the tenant's isolated dimension.
+- **Backend-For-Frontend (BFF):** Aggregated dashboard metrics endpoint designed to reduce client-side network round-trips and optimize initial load times.
 - **Performance & Observability:** Global rate limiting using the Sliding Window Counter algorithm via Redis. Centralized exception handler that dispatches real-time stack traces to Discord.
 
 ## 🚀 Getting Started

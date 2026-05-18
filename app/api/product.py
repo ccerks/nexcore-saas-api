@@ -8,7 +8,7 @@ from app.db.session import get_db
 from app.api.deps import get_current_user
 from app.models.user import User
 from app.models.product import Product
-from app.schemas.product import ProductCreate, ProductResponse
+from app.schemas.product import ProductCreate, ProductResponse, ProductUpdate
 from app.schemas.pagination import PaginatedResponse
 from app.services.product import ProductService
 from app.services.storage import StorageService
@@ -119,6 +119,45 @@ def bulk_create_products(
         )
 
     return created_products
+
+@router.patch("/{product_id}", response_model=ProductResponse)
+@limiter.limit("60/minute", key_func=user_token_key)
+def update_product(
+    request: Request,
+    product_id: UUID,
+    product_in: ProductUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Applies partial modifications to a product. 
+    Enforces tenant context isolation and automatically tracks the actor.
+    """
+    ensure_tenant_context(current_user)
+    
+    update_data = product_in.model_dump(exclude_unset=True)
+    
+    if not update_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="No valid fields provided for update."
+        )
+
+    product = ProductService.update(
+        db=db,
+        product_id=product_id,
+        product_in=update_data,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id
+    )
+    
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product not found or soft-deleted."
+        )
+        
+    return product
 
 @router.get("/", response_model=PaginatedResponse[ProductResponse])
 @limiter.limit("120/minute", key_func=user_token_key)

@@ -6,11 +6,11 @@
   ],
   "cpu": "256",
   "memory": "512",
-  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskExecutionRole",
+  "executionRoleArn": "arn:aws:iam::153106962722:role/ecsTaskExecutionRole",
   "containerDefinitions": [
     {
       "name": "nexcore-api",
-      "image": "ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/nexcore-api:latest",
+      "image": "153106962722.dkr.ecr.us-east-1.amazonaws.com/nexcore-api:latest",
       "essential": true,
       "portMappings": [
         {
@@ -23,16 +23,48 @@
         {
           "name": "ENVIRONMENT",
           "value": "production"
+        },
+        {
+          "name": "ALGORITHM",
+          "value": "HS256"
+        },
+        {
+          "name": "ACCESS_TOKEN_EXPIRE_MINUTES",
+          "value": "60"
+        },
+        {
+          "name": "STORAGE_TYPE",
+          "value": "s3"
+        },
+        {
+          "name": "AWS_REGION",
+          "value": "us-east-1"
         }
       ],
       "secrets": [
         {
           "name": "DATABASE_URL",
-          "valueFrom": "arn:aws:ssm:us-east-1:ACCOUNT_ID:parameter/nexcore/prod/database_url"
+          "valueFrom": "arn:aws:ssm:us-east-1:153106962722:parameter/nexcore/prod/database_url"
+        },
+        {
+          "name": "REDIS_URL",
+          "valueFrom": "arn:aws:ssm:us-east-1:153106962722:parameter/nexcore/prod/redis_url"
         },
         {
           "name": "SECRET_KEY",
-          "valueFrom": "arn:aws:ssm:us-east-1:ACCOUNT_ID:parameter/nexcore/prod/secret_key"
+          "valueFrom": "arn:aws:ssm:us-east-1:153106962722:parameter/nexcore/prod/secret_key"
+        },
+        {
+          "name": "STRIPE_SECRET_KEY",
+          "valueFrom": "arn:aws:ssm:us-east-1:153106962722:parameter/nexcore/prod/stripe_secret_key"
+        },
+        {
+          "name": "STRIPE_WEBHOOK_SECRET",
+          "valueFrom": "arn:aws:ssm:us-east-1:153106962722:parameter/nexcore/prod/stripe_webhook_secret"
+        },
+        {
+          "name": "DISCORD_WEBHOOK_URL",
+          "valueFrom": "arn:aws:ssm:us-east-1:153106962722:parameter/nexcore/prod/discord_webhook_url"
         }
       ],
       "logConfiguration": {

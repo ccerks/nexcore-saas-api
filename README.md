@@ -1,6 +1,6 @@
 # NexCore SaaS API 🚀
 
-![Version](https://img.shields.io/badge/version-2.0.0--beta-blue.svg)
+![Version](https://img.shields.io/badge/version-2.1.0--beta-blue.svg)
 ![Python](https://img.shields.io/badge/Python-3.10+-blue.svg?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-005571?logo=fastapi)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?logo=postgresql&logoColor=white)
@@ -13,7 +13,7 @@
 ![Pytest](https://img.shields.io/badge/Pytest-Certified-brightgreen.svg?logo=pytest)
 ![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub_Actions-2088FF?logo=githubactions&logoColor=white)
 
-NexCore is a robust, production-ready Multi-Tenant SaaS backend. In version 2.0.0, the architecture was upgraded to an **Enterprise Dedicated Schema** model, ensuring absolute physical data isolation, asynchronous performance tuning, and event-driven background processing.
+NexCore is a robust, production-ready Multi-Tenant SaaS backend. In version 2.1.0, the architecture was upgraded to an **Enterprise Dedicated Schema** model with a fully Cloud-Native deployment, ensuring absolute physical data isolation, asynchronous performance tuning, and event-driven background processing.
 
 ## 🏗️ Architecture & Stack
 - **Framework:** [FastAPI](https://fastapi.tiangolo.com/) (Async, Type Safety, OpenAPI)
@@ -24,7 +24,7 @@ NexCore is a robust, production-ready Multi-Tenant SaaS backend. In version 2.0.
 - **Cache & Rate Limiting:** [Redis](https://redis.io/)
 - **Message Broker:** [RabbitMQ](https://www.rabbitmq.com/) (Event-Driven Background Tasks)
 - **Async I/O Storage:** `aiofiles` for non-blocking local media handling
-- **Cloud Infrastructure & Storage:** AWS S3 (Asynchronous object manipulation via Boto3) & AWS ECS Fargate
+- **Cloud Infrastructure & Storage:** AWS ECS Fargate (Serverless Compute), AWS ECR, and AWS S3 (Asynchronous object manipulation via Boto3)
 - **Containerization:** [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/)
 - **Validation:** [Pydantic V2](https://docs.pydantic.dev/)
 - **Security:** JWT Authentication & Cross-Schema SQL Sniper Queries
@@ -105,7 +105,7 @@ erDiagram
 - **Enterprise Multi-tenancy:** Physical data isolation via dynamically generated PostgreSQL schemas per tenant. Prevents data leakage at the database engine level via a strict `get_tenant_db` dependency router.
 - **Cross-Schema Validation:** Employs raw SQL "Sniper Queries" to validate global states (e.g., Free Tier limits) directly from the `public` schema without losing the tenant's transaction context.
 - **Superadmin Impersonation:** Advanced contextual switching (Ephemeral DNA Injection) allowing global superadmins to operate within specific tenant boundaries securely.
-- **Continuous Deployment (CI/CD):** Fully automated GitHub Actions workflow targeting Amazon Elastic Container Registry (ECR) and AWS ECS Fargate for zero-downtime rolling updates.
+- **Continuous Deployment (CI/CD):** Fully automated GitHub Actions workflow targeting Amazon Elastic Container Registry (ECR) and AWS ECS Fargate for zero-downtime rolling updates. Secrets are securely injected in-memory at runtime via AWS SSM Parameter Store.
 - **Asynchronous Cloud Storage:** AWS S3 integration decoupled via RabbitMQ workers. Bulk Multipart Form-Data uploads are processed instantly using a flexible Storage Strategy, while deletion routines run non-blocking in the background.
 - **Query Optimization:** Implemented SQLAlchemy Eager Loading (`selectinload`) to eliminate N+1 query bottlenecks on nested 1:N relationships.
 - **Payment Gateway & Billing:** Stripe SDK integration for customer provisioning using Atomic Database Transactions, paired with a secure Webhook listener.
@@ -123,7 +123,9 @@ erDiagram
 - Stripe account (Test Mode Keys).
 - AWS Account (ECS Cluster, ECR Repository, S3 Bucket & IAM Keys).
 
-### Installation
+### Installation (Local Development)
+The project is containerized for seamless replication. Any developer can spin up the entire architecture locally:
+
 1. Clone the repository:
    ```bash
    git clone [https://github.com/ccerks/nexcore-saas-api.git](https://github.com/ccerks/nexcore-saas-api.git)
@@ -217,11 +219,14 @@ infrastructure/    # AWS ECS Fargate JSON Task Definitions
   - [x] Identity Lifecycle Management (RBAC & Password Rotation)
   - [x] Event-Driven Discord Business Intelligence (BI) Alerts
 
-- [ ] **Phase 6: Cloud-Native Evolution (v2.1.0--Planned)**
-  - [x] AWS S3 Asset Offloading (Strategy Pattern) *(Anticipated)*
+- [x] **Phase 6: Cloud-Native Evolution (v2.1.0--beta)**
+  - [x] AWS S3 Asset Offloading (Strategy Pattern)
   - [x] Continuous Deployment (CD) pipeline via GitHub Actions
   - [x] AWS Elastic Container Registry (ECR) pipeline integration
-  - [ ] Infrastructure scaling (AWS ECS Fargate)
-  - [ ] Cloudflare Edge Caching & Security
+  - [x] Infrastructure scaling (AWS ECS Fargate Serverless)
+  
+- [ ] **Phase 7: Edge Security & Domain (Planned)**
+  - [ ] Cloudflare DNS & Edge Caching
+  - [ ] Application Load Balancer (ALB) & Custom SSL Integration
 
 **Developed by** [Caio Cerqueira](https://github.com/ccerks) 🚀

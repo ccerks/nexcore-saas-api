@@ -39,6 +39,14 @@
         {
           "name": "AWS_REGION",
           "value": "us-east-1"
+        },
+        {
+          "name": "AWS_S3_BUCKET",
+          "value": "nexcore-saas-media-ccerks"
+        },
+        {
+          "name": "STRIPE_PUBLISHABLE_KEY",
+          "value": "pk_test_5cdscsdcwXM6ISoEF7XAoj6viQkIo4ZfvAIk00eAzQefO0"
         }
       ],
       "secrets": [
@@ -65,6 +73,14 @@
         {
           "name": "DISCORD_WEBHOOK_URL",
           "valueFrom": "arn:aws:ssm:us-east-1:153106962722:parameter/nexcore/prod/discord_webhook_url"
+        },
+        {
+          "name": "AWS_ACCESS_KEY_ID",
+          "valueFrom": "arn:aws:ssm:us-east-1:153106962722:parameter/nexcore/prod/aws_access_key_id"
+        },
+        {
+          "name": "AWS_SECRET_ACCESS_KEY",
+          "valueFrom": "arn:aws:ssm:us-east-1:153106962722:parameter/nexcore/prod/aws_secret_access_key"
         }
       ],
       "logConfiguration": {

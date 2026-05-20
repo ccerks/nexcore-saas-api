@@ -1,6 +1,9 @@
 services:
   api:
-    build: .
+    build:
+      context: .
+      args:
+        ENVIRONMENT: development
     container_name: nexcore_api
     ports:
       - "8000:8000"
@@ -14,7 +17,10 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   worker:
-    build: .
+    build:
+      context: .
+      args:
+        ENVIRONMENT: development
     container_name: nexcore_worker
     command: python worker.py
     depends_on:

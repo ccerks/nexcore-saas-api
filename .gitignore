@@ -1,28 +1,30 @@
-# Environments
+# === Environment & Secrets ===
 .env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-uploads/
+.env.local
+.env.*.local
+*.env
 
-# Python
+# === Python ===
 __pycache__/
 *.py[cod]
-*$py.class
+*.egg-info/
+dist/
+build/
+
+# === Virtual Environments ===
+venv/
+.venv/
+env/
+
+# === Testing & Coverage ===
+.pytest_cache/
+.coverage
+htmlcov/
+
+# === Binaries ===
+*.exe
+*.dll
 *.so
 
-# Alembic
-alembic.ini.bak
-
-# IDEs and Editors
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS generated files
-.DS_Store
-Thumbs.db
+# === Uploads (local dev artifacts) ===
+uploads/products/

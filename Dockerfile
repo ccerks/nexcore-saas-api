@@ -6,9 +6,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 COPY requirements.txt .
+COPY requirements-dev.txt .
+
+# Define the build argument with a secure default
+ARG ENVIRONMENT=production
 
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt && \
+    if [ "$ENVIRONMENT" = "development" ]; then \
+        pip install --no-cache-dir -r requirements-dev.txt; \
+    fi
 
 COPY . .
 

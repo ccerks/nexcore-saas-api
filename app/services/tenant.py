@@ -29,7 +29,7 @@ class TenantService:
     @staticmethod
     def get(db: Session, tenant_id: str) -> Tenant | None:
         db.execute(text('SET search_path TO "public"'))
-        return db.query(Tenant).get(tenant_id)
+        return db.get(Tenant, tenant_id)
 
     @staticmethod
     def get_by_slug(db: Session, slug: str) -> Tenant | None:

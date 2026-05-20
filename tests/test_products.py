@@ -103,6 +103,7 @@ def test_soft_delete_product_isolation(client, db):
 def test_upload_product_images(client, db):
     """
     Validates multipart form-data handling and active storage strategy integration.
+    Includes cryptographic magic bytes validation to bypass anti-spoofing middleware.
     """
     headers, tenant_id = get_authenticated_headers(client, db)
     payload = generate_dynamic_product_payload()
@@ -110,8 +111,9 @@ def test_upload_product_images(client, db):
     create_resp = client.post("/api/v1/products/", json=payload, headers=headers)
     product_id = create_resp.json()["id"]
 
-    # Mock file upload via HTTP client
-    files = [("files", ("test_image.png", b"dummy_image_data", "image/png"))]
+    # Mock file upload via HTTP client with valid PNG magic bytes signature
+    valid_png_magic_bytes = b"\x89PNG\r\n\x1a\n" + b"mock_data"
+    files = [("files", ("test_image.png", valid_png_magic_bytes, "image/png"))]
     upload_resp = client.post(f"/api/v1/products/{product_id}/images", headers=headers, files=files)
     
     assert upload_resp.status_code == status.HTTP_200_OK

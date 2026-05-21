@@ -105,5 +105,5 @@ jobs:
       run: |
         aws ecs update-service \
           --cluster nexcore-saas-cluster \
-          --service nexcore-saas-api-service \
+          --service nexcore-api-service-prod \
           --force-new-deployment

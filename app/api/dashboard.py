@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_tenant_db
 from app.models.user import User
 from app.schemas.dashboard import DashboardMetricsResponse
 from app.services.dashboard import DashboardService
@@ -18,12 +17,13 @@ def user_token_key(request: Request) -> str:
 @limiter.limit("30/minute", key_func=user_token_key)
 def get_dashboard_summary(
     request: Request,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_tenant_db),
     current_user: User = Depends(get_current_user)
 ):
     """
     Retrieves aggregated metrics and recent activity for the tenant's dashboard.
     Implements rate limiting to prevent heavy aggregate query abuse.
-    Architectural Note: Relies on the physical schema isolation enforced by get_current_user.
+    Architectural Fix: Uses get_tenant_db to route queries to the tenant's
+    dedicated schema where Products and AuditLogs physically reside.
     """
     return DashboardService.get_summary(db=db)

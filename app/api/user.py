@@ -10,6 +10,7 @@ from app.schemas.user import UserCreate, UserResponse, UserUpdatePassword, UserU
 from app.services.user import UserService
 from app.api.deps import get_current_user
 from app.models.user import User
+from app.models.tenant import Tenant
 from app.core.limiter import limiter
 from app.core.security import verify_password
 from app.services.audit import AuditService
@@ -35,6 +36,8 @@ def create_employee(
     """
     Creates a new user strictly bound to the authenticated admin's tenant.
     Prevents cross-tenant injection and handles global Superadmin bootstrapping.
+    Architectural Fix: Superadmins can now resolve the tenant from either
+    the x-tenant-id header (impersonation) or the JSON body, with header taking fallback priority.
     """
     ensure_admin_privileges(current_user)
     
@@ -54,22 +57,42 @@ def create_employee(
     if existing_username:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken.")
 
-    target_tenant_id = user_in.tenant_id if current_user.role == "superadmin" else current_user.tenant_id
+    # Architectural Fix: For superadmins, resolve tenant_id from body OR from the
+    # x-tenant-id header (ephemeral injection via get_current_user).
+    # Priority: body > header. This allows the superadmin to simply fill the
+    # x-tenant-id header in Swagger without needing to repeat it in the JSON body.
+    if current_user.role == "superadmin":
+        target_tenant_id = user_in.tenant_id or current_user.tenant_id
+    else:
+        target_tenant_id = current_user.tenant_id
+
     if not target_tenant_id and user_in.role != "superadmin":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Standard users must be bound to a tenant.")
+
+    # Architectural Shield: Validate that the resolved tenant actually exists
+    if target_tenant_id:
+        target_tenant = db.get(Tenant, target_tenant_id)
+        if not target_tenant:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="The specified tenant does not exist."
+            )
 
     user_in.tenant_id = target_tenant_id
     new_user = UserService.create(db, user_in=user_in)
     
-    if new_user.tenant:
-        schema_name = f"tenant_{new_user.tenant.slug}"
-        db.execute(text(f'SET search_path TO "{schema_name}"'))
-        AuditService.log_action(
-            db=db, tenant_id=new_user.tenant_id, user_id=current_user.id, 
-            action="CREATE_USER", entity_name="User", entity_id=new_user.email,
-            changes={"role": new_user.role}
-        )
-        db.commit()
+    if new_user.tenant_id:
+        tenant = db.get(Tenant, new_user.tenant_id)
+        if tenant:
+            schema_name = f"tenant_{tenant.slug}"
+            db.execute(text(f'SET search_path TO "{schema_name}"'))
+            AuditService.log_action(
+                db=db, tenant_id=new_user.tenant_id, user_id=current_user.id, 
+                action="CREATE_USER", entity_name="User", entity_id=new_user.email,
+                changes={"role": new_user.role}
+            )
+            db.commit()
+            db.execute(text('SET search_path TO "public"'))
 
     return new_user
 

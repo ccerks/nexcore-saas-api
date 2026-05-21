@@ -71,6 +71,88 @@ class TenantService:
         items = query.order_by(Tenant.created_at.desc()).offset((page - 1) * size).limit(size).all()
         return {"items": items, "total": total, "page": page, "size": size, "pages": pages}
 
+    # -------------------------------------------------------------------------
+    # Stripe Billing Lifecycle Methods
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def activate_subscription(db: Session, tenant_id: str, stripe_subscription_id: str) -> Tenant | None:
+        """
+        Called when Stripe fires 'checkout.session.completed'.
+
+        Architectural justification: We use client_reference_id (set to our internal
+        tenant_id during checkout creation) to link the completed payment back to the
+        correct Tenant record. This avoids an extra round-trip to Stripe's API and
+        guarantees idempotency — if the webhook fires twice, the update is a no-op.
+        """
+        db.execute(text('SET search_path TO "public"'))
+        tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+        if not tenant:
+            return None
+        db.query(Tenant).filter(Tenant.id == tenant.id).update({
+            "stripe_subscription_id": stripe_subscription_id,
+            "is_active": True
+        })
+        db.commit()
+        db.refresh(tenant)
+        return tenant
+
+    @staticmethod
+    def reactivate(db: Session, stripe_customer_id: str) -> Tenant | None:
+        """
+        Called when Stripe fires 'invoice.payment_succeeded'.
+
+        Restores tenant access after a successful subscription renewal. Designed to
+        recover from a previously suspended state caused by 'invoice.payment_failed'.
+        """
+        db.execute(text('SET search_path TO "public"'))
+        tenant = db.query(Tenant).filter(Tenant.stripe_customer_id == stripe_customer_id).first()
+        if not tenant:
+            return None
+        db.query(Tenant).filter(Tenant.id == tenant.id).update({"is_active": True})
+        db.commit()
+        db.refresh(tenant)
+        return tenant
+
+    @staticmethod
+    def suspend(db: Session, stripe_customer_id: str) -> Tenant | None:
+        """
+        Called when Stripe fires 'invoice.payment_failed'.
+
+        Suspends tenant access due to a billing failure. This is a reversible state —
+        the tenant is reactivated if a subsequent payment succeeds before Stripe
+        cancels the subscription entirely.
+        """
+        db.execute(text('SET search_path TO "public"'))
+        tenant = db.query(Tenant).filter(Tenant.stripe_customer_id == stripe_customer_id).first()
+        if not tenant:
+            return None
+        db.query(Tenant).filter(Tenant.id == tenant.id).update({"is_active": False})
+        db.commit()
+        db.refresh(tenant)
+        return tenant
+
+    @staticmethod
+    def clear_subscription(db: Session, stripe_customer_id: str) -> Tenant | None:
+        """
+        Called when Stripe fires 'customer.subscription.deleted'.
+
+        Permanently deactivates the tenant and clears the subscription reference.
+        Unlike 'suspend', this is a terminal state triggered by full cancellation —
+        the subscription ID is nullified to prevent stale billing references.
+        """
+        db.execute(text('SET search_path TO "public"'))
+        tenant = db.query(Tenant).filter(Tenant.stripe_customer_id == stripe_customer_id).first()
+        if not tenant:
+            return None
+        db.query(Tenant).filter(Tenant.id == tenant.id).update({
+            "is_active": False,
+            "stripe_subscription_id": None
+        })
+        db.commit()
+        db.refresh(tenant)
+        return tenant
+
     @staticmethod
     def create(db: Session, tenant_in: TenantCreate) -> dict:
         """

@@ -21,4 +21,6 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Architectural Fix: Run Alembic migrations before starting the API server.
+# This ensures the production database schema is always synchronized on every deploy.
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]

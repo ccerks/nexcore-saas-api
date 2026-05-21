@@ -62,7 +62,7 @@ def create_employee(
     # Priority: body > header. This allows the superadmin to simply fill the
     # x-tenant-id header in Swagger without needing to repeat it in the JSON body.
     if current_user.role == "superadmin":
-        target_tenant_id = user_in.tenant_id or current_user.tenant_id
+        target_tenant_id = current_user.tenant_id or user_in.tenant_id
     else:
         target_tenant_id = current_user.tenant_id
 

@@ -1,11 +1,12 @@
 # NexCore SaaS API 🚀
 
-![Version](https://img.shields.io/badge/version-2.1.0--beta-blue.svg)
+![Version](https://img.shields.io/badge/version-2.2.0--beta-blue.svg)
 ![Python](https://img.shields.io/badge/Python-3.10+-blue.svg?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-005571?logo=fastapi)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?logo=postgresql&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white)
 ![RabbitMQ](https://img.shields.io/badge/RabbitMQ-FF6600?logo=rabbitmq&logoColor=white)
+![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?logo=prometheus&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
 ![AWS S3](https://img.shields.io/badge/AWS_S3-569A31?logo=amazons3&logoColor=white)
 ![AWS ECS](https://img.shields.io/badge/AWS_Fargate-FF9900?logo=amazonaws&logoColor=white)
@@ -13,22 +14,24 @@
 ![Pytest](https://img.shields.io/badge/Pytest-Certified-brightgreen.svg?logo=pytest)
 ![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub_Actions-2088FF?logo=githubactions&logoColor=white)
 
-NexCore is a robust, production-ready Multi-Tenant SaaS backend. In version 2.1.0, the architecture was upgraded to an **Enterprise Dedicated Schema** model with a fully Cloud-Native deployment, ensuring absolute physical data isolation, asynchronous performance tuning, and event-driven background processing.
+NexCore is a robust, production-ready Multi-Tenant SaaS backend. In version 2.2.0, the architecture was upgraded to an **Enterprise Dedicated Schema** model with a fully Cloud-Native deployment, ensuring absolute physical data isolation, Edge Security, and real-time Observability via Prometheus.
 
 ## 🏗️ Architecture & Stack
 - **Framework:** [FastAPI](https://fastapi.tiangolo.com/) (Async, Type Safety, OpenAPI)
 - **Database:** [PostgreSQL](https://www.postgresql.org/) with [SQLAlchemy 2.0](https://www.sqlalchemy.org/)
 - **Multi-Tenancy:** Dedicated PostgreSQL Schemas (Physical Isolation)
+- **Observability:** Prometheus Metrics & Discord Alerts
 - **Testing:** [Pytest](https://docs.pytest.org/) & [Faker](https://faker.readthedocs.io/) (TDD Approach with Dynamic Schema Routing)
 - **Migrations:** [Alembic](https://alembic.sqlalchemy.org/) (Dynamic Schema Routing)
 - **Cache & Rate Limiting:** [Redis](https://redis.io/)
 - **Message Broker:** [RabbitMQ](https://www.rabbitmq.com/) (Event-Driven Background Tasks)
 - **Async I/O Storage:** `aiofiles` for non-blocking local media handling
-- **Cloud Infrastructure & Storage:** AWS ECS Fargate (Serverless Compute), AWS ECR, and AWS S3 (Asynchronous object manipulation via Boto3)
+- **Cloud Infrastructure & Storage:** AWS ECS Fargate (Serverless Compute), AWS ALB (Load Balancing), AWS ACM (SSL), Cloudflare DNS, and AWS S3
 - **Containerization:** [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/)
 - **Validation:** [Pydantic V2](https://docs.pydantic.dev/)
 - **Security:** JWT Authentication & Cross-Schema SQL Sniper Queries
 - **Payments:** [Stripe Python SDK](https://stripe.com/docs/api)
+- **Front-End:** Vanilla HTML/CSS/JS Premium Landing Page
 
 ### 🗄️ Database Entity-Relationship (Physical Schema Isolation)
 NexCore utilizes a strict multi-dimensional database topology. Global entities reside in the `public` schema, while each tenant gets a dynamically provisioned isolated schema (`tenant_<slug>`). Foreign keys securely cross these boundaries.
@@ -103,6 +106,8 @@ erDiagram
 
 ## 🌟 Key Features
 - **Enterprise Multi-tenancy:** Physical data isolation via dynamically generated PostgreSQL schemas per tenant. Prevents data leakage at the database engine level via a strict `get_tenant_db` dependency router.
+- **Edge Security & HTTPS:** Production deployment behind an AWS Application Load Balancer with strict SSL/TLS encryption and Cloudflare Proxy.
+- **Observability (APM):** Prometheus `/metrics` exposition tracking request latency, status codes, and HTTP method distributions in real-time.
 - **Cross-Schema Validation:** Employs raw SQL "Sniper Queries" to validate global states (e.g., Free Tier limits) directly from the `public` schema without losing the tenant's transaction context.
 - **Superadmin Impersonation:** Advanced contextual switching (Ephemeral DNA Injection) allowing global superadmins to operate within specific tenant boundaries securely.
 - **Continuous Deployment (CI/CD):** Fully automated GitHub Actions workflow targeting Amazon Elastic Container Registry (ECR) and AWS ECS Fargate for zero-downtime rolling updates. Secrets are securely injected in-memory at runtime via AWS SSM Parameter Store.
@@ -114,21 +119,21 @@ erDiagram
 - **Advanced Catalog:** Complex product management supporting hierarchical SKU variations, JSON-based dynamic attributes, promotional pricing, reserved stock guards, and auto-incrementing friendly IDs via PostgreSQL sequences.
 - **Idempotent Soft-Delete & Traceability:** Robust `PATCH /restore` mechanism paired with immutable audit logging stored safely within the tenant's isolated dimension.
 - **Backend-For-Frontend (BFF):** Aggregated dashboard metrics endpoint designed to reduce client-side network round-trips and optimize initial load times.
-- **Performance & Observability:** Global rate limiting using the Sliding Window Counter algorithm via Redis. Centralized exception handler that dispatches real-time stack traces to Discord.
+- **Performance & Security:** Global rate limiting using the Sliding Window Counter algorithm via Redis. Centralized exception handler that dispatches real-time stack traces to Discord.
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 - Docker & Docker Compose installed.
 - Stripe account (Test Mode Keys).
-- AWS Account (ECS Cluster, ECR Repository, S3 Bucket & IAM Keys).
+- AWS Account (ECS Cluster, ALB, ECR Repository, S3 Bucket & IAM Keys).
 
 ### Installation (Local Development)
 The project is containerized for seamless replication. Any developer can spin up the entire architecture locally:
 
 1. Clone the repository:
    ```bash
-   git clone [https://github.com/ccerks/nexcore-saas-api.git](https://github.com/ccerks/nexcore-saas-api.git)
+   git clone https://github.com/ccerks/nexcore-saas-api.git
    cd nexcore-saas-api
    ```
 2. Configure environment variables:
@@ -171,16 +176,16 @@ To handle real-time billing events (Webhooks) during development:
    ```
 
 ## 📡 Observability & Monitoring
-The system features a Global Exception Handler that monitors API health in real-time.
+The system features a Global Exception Handler and Prometheus Metrics exposition.
 
-- **Discord Integration:** Any `500` error or system bootstrap triggers an automated webhook alert.
-- **Payload Sanitization:** While the engineering team receives the full stack trace, the end-user sees a safe, sanitized message.
+- **Discord Integration:** Any `500` error or system bootstrap triggers an automated webhook alert. Payload Sanitization ensures end-users see a safe message, while engineers get the full stack trace.
+- **Prometheus APM:** Request metrics are exposed at `/metrics` to track API health, latency, and status code distributions in real-time.
 
 ## 🛠️ Project Structure
 ```text
   app/
   ├── api/         # Route handlers (Endpoints)
-  ├── core/        # Global configs (Security, Env)
+  ├── core/        # Global configs (Security, Env, Metrics)
   ├── db/          # Session management & engine
   ├── models/      # SQLAlchemy database models
   ├── schemas/     # Pydantic data contracts
@@ -207,7 +212,7 @@ infrastructure/    # AWS ECS Fargate JSON Task Definitions
   - [x] 1:N Product Images Architecture (Multipart & S3)
   - [x] Idempotent Soft-Delete Restoration
         
-- [x] **Phase 4: Performance & Observability**
+- [x] **Phase 4: Performance & Observability Core**
   - [x] Redis Rate Limiting & Global Exception Handling
   - [x] Automated Testing Suite (Pytest + Faker)
         
@@ -216,7 +221,6 @@ infrastructure/    # AWS ECS Fargate JSON Task Definitions
   - [x] Alembic dynamic routing logic for multi-tenancy
   - [x] Asynchronous messaging via RabbitMQ
   - [x] Backend for Frontend (BFF) Dashboard Analytics
-  - [x] Identity Lifecycle Management (RBAC & Password Rotation)
   - [x] Event-Driven Discord Business Intelligence (BI) Alerts
 
 - [x] **Phase 6: Cloud-Native Evolution (v2.1.0--beta)**
@@ -225,8 +229,17 @@ infrastructure/    # AWS ECS Fargate JSON Task Definitions
   - [x] AWS Elastic Container Registry (ECR) pipeline integration
   - [x] Infrastructure scaling (AWS ECS Fargate Serverless)
   
-- [ ] **Phase 7: Edge Security & Domain (Planned)**
-  - [ ] Cloudflare DNS & Edge Caching
-  - [ ] Application Load Balancer (ALB) & Custom SSL Integration
+- [x] **Phase 7: Edge Security & Domain (v2.1.1--beta)**
+  - [x] Cloudflare DNS & Edge Caching
+  - [x] Application Load Balancer (ALB) & Custom SSL Integration
+  - [x] Premium Landing Page Showcase
+
+- [x] **Phase 8: Observability & APM (v2.2.0--beta)**
+  - [x] Prometheus `/metrics` exposition
+  - [x] Latency, HTTP status, and Request volume tracking
+
+- [ ] **Phase 9: Reliability (Planned)**
+  - [ ] Idempotency Keys (Redis)
+  - [ ] Semantic Caching
 
 **Developed by** [Caio Cerqueira](https://github.com/ccerks) 🚀
